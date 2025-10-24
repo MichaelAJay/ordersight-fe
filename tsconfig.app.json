@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "composite": true, // needed because root tsconfig references this project
+    "jsx": "react-jsx", // React 17+ transform (works with React 19)
+    "module": "ESNext",
+    "moduleResolution": "bundler", // aligns with Vite/SWC
+    "types": ["vite/client"] // Vite env types (import.meta.env.*, etc.)
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+}
