@@ -134,7 +134,7 @@ api.interceptors.response.use(
       try {
         await fetchCsrfFromEndpoint(api);
         const retryCfg = {
-          ...API_BASE_URL(err.config as AxiosRequestConfig),
+          ...(err.config as AxiosRequestConfig),
           _retried: true,
         } as AxiosRequestConfig & { _retried?: boolean };
 
