@@ -1,0 +1,18 @@
+.nav {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #1f2937;
+}
+.nav a {
+  text-decoration: none;
+  color: var(--color-fg);
+  opacity: 0.85;
+}
+.nav a.active {
+  opacity: 1;
+  text-decoration: underline;
+}
+main {
+  padding: 1rem;
+}

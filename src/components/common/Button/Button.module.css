@@ -1,0 +1,35 @@
+.btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--color-fg);
+}
+.primary {
+  background: var(--color-primary);
+  color: white;
+}
+.secondary {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.outline {
+  border-color: currentColor;
+  background: transparent;
+}
+.sm {
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.9rem;
+}
+.md {
+  font-size: 1rem;
+}
+.lg {
+  padding: calc(var(--space-2) + 2px) calc(var(--space-4) + 4px);
+  font-size: 1.1rem;
+}
+.block {
+  width: 100%;
+}
