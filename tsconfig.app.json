@@ -4,6 +4,7 @@
     "jsx": "react-jsx", // React 17+ transform (works with React 19)
     "module": "ESNext",
     "moduleResolution": "bundler", // aligns with Vite/SWC
+    "lib": ["ESNext", "DOM", "DOM.Iterable"], // required for Set, Map, and DOM APIs
     "types": ["vite/client"] // Vite env types (import.meta.env.*, etc.)
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
