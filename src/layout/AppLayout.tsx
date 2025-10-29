@@ -8,7 +8,7 @@ export default function AppLayout() {
         <NavLink to="/dashboard">Dashboard</NavLink>
         <NavLink to="/stores">Stores</NavLink>
         <NavLink to="/menus">Menus</NavLink>
-        <NavLink to="orders">Orders</NavLink>
+        <NavLink to="/orders">Orders</NavLink>
         <NavLink to="/contacts">Contacts</NavLink>
         <NavLink to="/billing">Billing</NavLink>
         <NavLink to="/audits">Audit Logs</NavLink>
