@@ -1,13 +1,14 @@
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "composite": true, // required for project references
+    "composite": true,
     "module": "ESNext",
-    "moduleResolution": "bundler", // Vite’s ESM toolchain
-    "types": [
-      "node", // Node typings for config files
-      "vitest/importMeta", // enables import.meta in tests
-      "vitest/globals" // if using Vitest globals (describe/it/expect)
-    ]
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "types": ["node", "vitest/importMeta", "vitest/globals"],
+    "noEmit": false
   },
-  "include": ["vite.config.ts", "src/test/setup.ts", "src/**/*.test.ts", "src/**/*.test.tsx"]
+  "include": ["vite.config.ts", "src/test/setup.ts", "src/**/*.ts", "src/**/*.tsx"]
 }
