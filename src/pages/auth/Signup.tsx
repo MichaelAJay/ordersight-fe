@@ -74,7 +74,7 @@ export default function Signup() {
 
         <label>
           Last Name
-          <input type="text" {...register('first_name')} disabled={signupMutation.isPending} />
+          <input type="text" {...register('last_name')} disabled={signupMutation.isPending} />
         </label>
 
         <button type="submit" disabled={signupMutation.isPending}>
