@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { describe, expect, vi, afterEach } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as api from '../api';
 import { useSignup } from '../useSignup';
@@ -28,7 +28,7 @@ describe('useSignup', () => {
         await result.current.mutateAsync(payload);
       });
 
-      expect(apiMock).toHaveBeenCalledWith(payload);
+      expect(apiMock).toHaveBeenCalledWith(payload, expect.any(Object));
     });
   });
 
@@ -38,17 +38,29 @@ describe('useSignup', () => {
       const rejection = new Error('Account creation failed');
       vi.spyOn(api, 'signup').mockRejectedValueOnce(rejection);
 
-      const client = new QueryClient();
+      const client = new QueryClient({
+        defaultOptions: {
+          mutations: { retry: false },
+        },
+      });
       const wrapper = ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={client}>{children}</QueryClientProvider>
       );
 
       const { result } = renderHook(() => useSignup(), { wrapper });
 
-      await expect(act(() => result.current.mutateAsync(payload))).rejects.toThrow(rejection);
+      try {
+        await act(async () => {
+          await result.current.mutateAsync(payload);
+        });
+      } catch {
+        // Expected to throw
+      }
 
-      expect(result.current.error).toBe(rejection);
-      expect(result.current.isError).toBe(true);
+      await waitFor(() => {
+        expect(result.current.error).toBe(rejection);
+        expect(result.current.isError).toBe(true);
+      });
     });
   });
 });

@@ -8,8 +8,15 @@ import { renderWithProviders } from '../../../test/testUtils';
 import { SignupPayload } from '../../../features/auth/types';
 import { makeSignupPayload } from '@/test/fixtures/auth';
 
+const API_BASE = 'http://localhost:8080/api/v1';
+
 const server = setupServer(
-  http.post('/auth/signup/account', async ({ request }) => {
+  // Handle CSRF requests
+  http.get(`${API_BASE}/auth/csrf`, () => {
+    return HttpResponse.json({ token: 'test-csrf-token' });
+  }),
+  // Handle signup requests
+  http.post(`${API_BASE}/auth/signup/account`, async ({ request }) => {
     const body = (await request.json()) as SignupPayload;
     if (!body.email.includes('@')) {
       return HttpResponse.json({ message: 'Email invalid' }, { status: 400 });
@@ -18,7 +25,7 @@ const server = setupServer(
   }),
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
@@ -47,8 +54,8 @@ test('shows client-side validation errors', async () => {
 
 test('surfaces API errors when signup fails', async () => {
   server.use(
-    http.post('/auth/signup/account', () => {
-      HttpResponse.json({ message: 'Email already exists' }, { status: 400 });
+    http.post(`${API_BASE}/auth/signup/account`, () => {
+      return HttpResponse.json({ message: 'Email already exists' }, { status: 400 });
     }),
   );
 

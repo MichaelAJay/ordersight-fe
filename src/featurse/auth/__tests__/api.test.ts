@@ -11,7 +11,7 @@ describe('signup API', () => {
 
     const result = await signup(payload);
 
-    expect(postSpy).toHaveBeenCalledWith('/auth/signup/account', payload, undefined);
+    expect(postSpy).toHaveBeenCalledWith('/auth/signup/account', payload);
     expect(result).toEqual(response);
   });
 });

@@ -59,26 +59,39 @@ describe('http interceptors', () => {
     const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
     const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
 
-    await errorInterceptor({
-      response: { status: 401 },
-      config: { url: '/secure', method: 'get' },
+    await expect(
+      errorInterceptor({
+        response: { status: 401 },
+        config: { url: '/secure', method: 'get' },
+        message: 'Unauthorized',
+      }),
+    ).rejects.toEqual({
+      status: 401,
+      url: '/secure',
+      method: 'GET',
+      message: 'Unauthorized',
+      details: undefined,
     });
 
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
   test('retries once on CSRF 403', async () => {
+    getMock.mockResolvedValueOnce({ data: { token: 'new-csrf-token' } } as AxiosResponse);
     requestMock.mockResolvedValueOnce({ data: 'ok' } as AxiosResponse);
+
     const axios = await import('axios');
     const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
     const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
 
     const retry = errorInterceptor({
       response: { status: 403 },
-      config: { url: '/mutate', method: 'post' },
+      config: { url: '/mutate', method: 'post', headers: {} },
+      message: 'Forbidden',
     });
 
     await expect(retry).resolves.toEqual({ data: 'ok' });
+    expect(getMock).toHaveBeenCalledWith('/auth/csrf', { withCredentials: true });
     expect(requestMock).toHaveBeenCalledTimes(1);
   });
 });

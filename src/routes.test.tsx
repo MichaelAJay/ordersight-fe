@@ -1,19 +1,40 @@
-import { renderWithProviders } from './test/testUtils';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen } from '@testing-library/react';
 import { RouterProvider, createMemoryRouter } from 'react-router-dom';
 import { router as appRouter } from './routes';
-import { screen } from '@testing-library/react';
+
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+}
 
 test('renders standalone auth pages without layout nav', async () => {
   const router = createMemoryRouter(appRouter.routes, { initialEntries: ['/signup'] });
+  const queryClient = createTestQueryClient();
 
-  renderWithProviders(<RouterProvider router={router} />, { routeEntries: ['/signup'] });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 
   expect(await screen.findByRole('heading', { name: /create your account/i })).toBeInTheDocument();
   expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
 });
 
 test('renders dashboard under AppLayout with nav links', async () => {
-  renderWithProviders(<RouterProvider router={appRouter} />, { routeEntries: ['/dashboard'] });
+  const router = createMemoryRouter(appRouter.routes, { initialEntries: ['/dashboard'] });
+  const queryClient = createTestQueryClient();
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 
   expect(await screen.findByRole('heading', { name: /dashboard/i })).toBeInTheDocument();
   expect(screen.getByRole('navigation')).toBeInTheDocument();
