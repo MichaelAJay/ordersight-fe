@@ -8,7 +8,6 @@ import axios, {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 const CSRF_HEADER = (import.meta.env.VITE_CSRF_HEADER as string) || 'X-CSRF-Token';
-const CSRF_COOKIE = import.meta.env.VITE_CSRF_COOKIE as string | undefined;
 const CSRF_ENDPOINT = import.meta.env.VITE_CSRF_ENDPOINT ?? '/auth/csrf';
 
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
@@ -38,13 +37,6 @@ export function clearCsrf(): void {
   csrfTokenInMemory = null;
 }
 
-function readCookie(name: string): string | null {
-  const m = document.cookie.match(
-    new RegExp(`(?:^|; )${name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}=([^;]*)`),
-  );
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
 /** Fetch CSRF token from endpoint and keep only in memory */
 async function fetchCsrfFromEndpoint(client: AxiosInstance) {
   if (!pendingCsrfPromise) {
@@ -70,22 +62,12 @@ async function ensureCsrfHeader(config: InternalAxiosRequestConfig, client: Axio
     return;
   }
 
-  // Double-submit cookie (if configured)
-  if (CSRF_COOKIE) {
-    const cookieVal = readCookie(CSRF_COOKIE);
-    if (cookieVal) {
-      config.headers[CSRF_HEADER] = cookieVal;
-      return;
-    }
+  // Fetch token from endpoint if not in memory
+  if (!csrfTokenInMemory) {
+    csrfTokenInMemory = await fetchCsrfFromEndpoint(client);
   }
 
-  // Endpoint flow (default)
-  if (!csrfTokenInMemory) {
-    const token = await fetchCsrfFromEndpoint(client);
-    if (token) {
-      config.headers[CSRF_HEADER] = token;
-    }
-  } else {
+  if (csrfTokenInMemory) {
     config.headers[CSRF_HEADER] = csrfTokenInMemory;
   }
 }
