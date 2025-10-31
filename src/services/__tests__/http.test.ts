@@ -1,15 +1,16 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import type { AxiosInstance, AxiosResponse } from 'axios';
 
-const requestMock = vi.fn();
 const getMock = vi.fn();
+const postMock = vi.fn();
+const requestMock = vi.fn();
 
 vi.mock('axios', async () => {
   const actual = await vi.importActual<typeof import('axios')>('axios');
 
   const instance: Pick<AxiosInstance, 'get' | 'post' | 'request' | 'interceptors'> = {
     get: getMock,
-    post: vi.fn(),
+    post: postMock,
     request: requestMock,
     interceptors: {
       request: {
@@ -84,14 +85,74 @@ describe('http interceptors', () => {
     const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
     const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
 
-    const retry = errorInterceptor({
-      response: { status: 403 },
-      config: { url: '/mutate', method: 'post', headers: {} },
-      message: 'Forbidden',
-    });
-
-    await expect(retry).resolves.toEqual({ data: 'ok' });
+    await expect(
+      errorInterceptor({
+        response: { status: 403 },
+        config: { url: '/mutate', method: 'post', headers: {} },
+        message: 'Forbidden',
+      }),
+    ).resolves.toEqual({ data: 'ok' });
     expect(getMock).toHaveBeenCalledWith('/auth/csrf', { withCredentials: true });
     expect(requestMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not retry if already retried', async () => {
+    const axios = await import('axios');
+    const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
+    const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
+
+    await expect(
+      errorInterceptor({
+        response: { status: 403 },
+        config: { url: '/mutate', method: 'post', headers: {}, _retried: true },
+        message: 'Forbidden',
+      }),
+    ).rejects.toEqual({
+      status: 403,
+      url: '/mutate',
+      method: 'POST',
+      message: 'Forbidden',
+      details: undefined,
+    });
+
+    expect(getMock).not.toHaveBeenCalled();
+    expect(requestMock).not.toHaveBeenCalled();
+  });
+
+  test('does not try CSRF if status not 403 or 419', async () => {
+    const axios = await import('axios');
+    const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
+    const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
+
+    await expect(
+      errorInterceptor({
+        response: { status: 404 },
+        config: { url: '/mutate', method: 'post', headers: {} },
+        message: 'NotFound',
+      }),
+    ).rejects.toEqual({
+      status: 404,
+      url: '/mutate',
+      method: 'POST',
+      message: 'NotFound',
+      details: undefined,
+    });
+
+    expect(getMock).not.toHaveBeenCalled();
+    expect(requestMock).not.toHaveBeenCalled();
+  });
+
+  test('passes through non-error responses', async () => {
+    const axios = await import('axios');
+    const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
+    const [fulfilledInterceptor] = instance.interceptors.response.use.mock.calls[0];
+
+    const mockResponse = { status: 201, data: 'ok', config: { url: '/mutate' } };
+
+    const result = await fulfilledInterceptor(mockResponse);
+
+    expect(result).toBe(mockResponse);
+    expect(getMock).not.toHaveBeenCalled();
+    expect(requestMock).not.toHaveBeenCalled();
   });
 });
