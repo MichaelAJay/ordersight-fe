@@ -1,7 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import './layout.css';
 
-export default function AppLayout() {
+export default function AuthenticatedLayout() {
   return (
     <div>
       <nav className="nav">
