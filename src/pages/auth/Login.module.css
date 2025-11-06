@@ -120,6 +120,12 @@
   cursor: not-allowed;
 }
 
+@media (prefers-contrast: high) {
+  .form-input:focus {
+    outline: 3px solid var(--color-primary);
+  }
+}
+
 /* Light mode adjustments */
 @media (prefers-color-scheme: light) {
   .form-input {
