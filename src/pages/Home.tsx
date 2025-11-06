@@ -1,3 +1,35 @@
+import { useNavigate } from 'react-router-dom';
+import { Button } from '../components/common/Button/Button';
+import './Home.css';
+
 export default function Home() {
-  return <h1>This is Home</h1>;
+  const navigate = useNavigate();
+
+  return (
+    <div className="landing-page">
+      <header className="landing-header">
+        <h1>Welcome to Ordersight</h1>
+        <p>The amazing application that does amazing things</p>
+      </header>
+
+      <section className="landing-cta">
+        <Button variant="primary" size="lg" onClick={() => navigate('/signup')}>
+          Sign Up
+        </Button>
+
+        <Button variant="outline" size="lg" onClick={() => navigate('/login')}>
+          Login
+        </Button>
+      </section>
+
+      <section className="landing-features">
+        <h2>Why OrderSight?</h2>
+        <ul>
+          <li>Manage your stores effortlessly</li>
+          <li>Track orders in real-time</li>
+          <li>Grow your business with insights</li>
+        </ul>
+      </section>
+    </div>
+  );
 }
