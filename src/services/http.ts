@@ -114,7 +114,7 @@ api.interceptors.response.use(
       !(err.config as { _retried?: boolean })._retried;
     if (canRetryCsrf) {
       try {
-        await fetchCsrfFromEndpoint(api);
+        csrfTokenInMemory = await fetchCsrfFromEndpoint(api);
         const retryCfg = {
           ...(err.config as AxiosRequestConfig),
           _retried: true,
