@@ -12,6 +12,7 @@ import {
   OAuthLoginRequest,
   getErrorDetails,
   AuthErrorCode,
+  AuthProvider,
   // AuthProvider,
 } from '../types/auth';
 import type { HttpError } from './http';
@@ -25,11 +26,16 @@ const AUTH_BASE = '/auth';
 /**
  * Authenticate with email/password
  */
-export async function loginWithPassword(email: string, password: string): Promise<AuthOutcome> {
+export async function loginWithPassword(
+  email: string,
+  password: string,
+  provider: AuthProvider,
+): Promise<AuthOutcome> {
   try {
     const result = await postJSON<PasswordLoginRequest, AuthResult>(`${AUTH_BASE}/login`, {
       email,
       password,
+      provider,
     });
 
     return transformAuthResult(result);

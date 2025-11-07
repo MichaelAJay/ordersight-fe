@@ -28,7 +28,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const outcome = await loginWithPassword(email, password);
+      const outcome = await loginWithPassword(email, password, 'password');
 
       if (isAuthSuccess(outcome)) {
         login(outcome.sessionId, outcome.subjectId);

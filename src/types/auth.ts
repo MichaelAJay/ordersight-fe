@@ -90,6 +90,7 @@ export interface BackendError {
 export interface PasswordLoginRequest {
   email: string;
   password: string;
+  provider: AuthProvider;
 }
 
 export interface OAuthLoginRequest {
