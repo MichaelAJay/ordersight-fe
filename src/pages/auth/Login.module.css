@@ -140,3 +140,21 @@
     background-color: #ddd;
   }
 }
+
+.divider.action-prompt {
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.action-link {
+  background: none;
+  border: none;
+  color: var(--color-primary, #0066cc);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.action-link:hover {
+  color: var(--color-primary-dark, #0052a3);
+}

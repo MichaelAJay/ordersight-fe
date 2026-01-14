@@ -40,6 +40,7 @@ export async function loginWithPassword(
 
     return transformAuthResult(result);
   } catch (error) {
+    console.error('In auth service loginWithPassword', error);
     return handleAuthError(error);
   }
 }
@@ -83,6 +84,24 @@ export async function verifyMFA(mfaToken: string, code: string): Promise<AuthOut
 }
 
 // ============================================================================
+// Account Management
+// ============================================================================
+/**
+ * Resend Email Verification for password verification
+ */
+export async function resendVerificationEmail(email: string): Promise<unknown> {
+  try {
+    const result = await postJSON<unknown, unknown>(`${AUTH_BASE}/resend-email-verification`, {
+      email,
+    });
+    return result;
+  } catch (error) {
+    console.error('error', error);
+    throw error;
+  }
+}
+
+// ============================================================================
 // OAuth Helper Methods (Stubs for now)
 // ============================================================================
 
@@ -104,6 +123,41 @@ export function initiateOAuthLogin(provider: 'google' | 'facebook'): void {
   const authUrl = getOAuthLoginUrl(provider);
   // In a real implementation, the backend would redirect to the OAuth provider
   window.location.href = authUrl;
+}
+
+// ============================================================================
+// Session Management
+// ============================================================================
+
+/**
+ * Logout current user
+ */
+export async function logout(): Promise<void> {
+  try {
+    await postJSON(`${AUTH_BASE}/logout`, {});
+  } catch (error) {
+    // Log but don't throw - logout should always succeed locally
+    console.error('Logout failed:', error);
+  }
+}
+
+/**
+ * Check if user is currently authenticated
+ * This would typically call a /me or /session endpoint
+ */
+export async function checkSession(): Promise<{
+  authenticated: boolean;
+  subjectId?: string;
+}> {
+  try {
+    const result = await postJSON<void, { authenticated: boolean; subjectId?: string }>(
+      `${AUTH_BASE}/session`,
+      undefined,
+    );
+    return result;
+  } catch {
+    return { authenticated: false };
+  }
 }
 
 // ============================================================================
@@ -165,13 +219,13 @@ function handleAuthError(error: unknown): AuthOutcome {
   // HTTP error from our interceptor
   if (isHttpError(error)) {
     // Check if backend sent an error code in the response
-    const details = error.details as { errorCode?: AuthErrorCode; message?: string };
+    const details = error.details as { code?: AuthErrorCode; message?: string };
 
-    if (details?.errorCode) {
-      const { message, action } = getErrorDetails(details.errorCode);
+    if (details?.code) {
+      const { message, action } = getErrorDetails(details.code);
       return {
         type: 'ERROR',
-        errorCode: details.errorCode,
+        errorCode: details.code,
         message: details.message || message,
         httpStatus: error.status,
         action,
@@ -199,41 +253,6 @@ function handleAuthError(error: unknown): AuthOutcome {
 // Type guard for HttpError
 function isHttpError(error: unknown): error is HttpError {
   return typeof (error as { message?: unknown })?.message === 'string';
-}
-
-// ============================================================================
-// Session Management
-// ============================================================================
-
-/**
- * Logout current user
- */
-export async function logout(): Promise<void> {
-  try {
-    await postJSON(`${AUTH_BASE}/logout`, {});
-  } catch (error) {
-    // Log but don't throw - logout should always succeed locally
-    console.error('Logout failed:', error);
-  }
-}
-
-/**
- * Check if user is currently authenticated
- * This would typically call a /me or /session endpoint
- */
-export async function checkSession(): Promise<{
-  authenticated: boolean;
-  subjectId?: string;
-}> {
-  try {
-    const result = await postJSON<void, { authenticated: boolean; subjectId?: string }>(
-      `${AUTH_BASE}/session`,
-      undefined,
-    );
-    return result;
-  } catch {
-    return { authenticated: false };
-  }
 }
 
 // ============================================================================

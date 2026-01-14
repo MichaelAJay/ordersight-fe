@@ -1,19 +1,27 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { isAuthMFARequired, isAuthSuccess, loginWithPassword } from '../../services/auth';
+import {
+  isAuthMFARequired,
+  isAuthSuccess,
+  loginWithPassword,
+  resendVerificationEmail,
+} from '../../services/auth';
 import styles from './Login.module.css';
 import { Button } from '../../components/common/Button/Button';
+import { AuthErrorAction } from '../../types/auth';
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const login = useAuthStore((state) => state.login);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // DEV: Autopopulate for easier debugging
+  const [email, setEmail] = useState('michael.a.jay82@gmail.com');
+  const [password, setPassword] = useState('myPW123!@#');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorAction, setErrorAction] = useState<AuthErrorAction | null>(null);
 
   const errorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -40,12 +48,23 @@ export default function Login() {
       } else {
         // Display error to use
         setError(outcome.message);
+        setErrorAction(outcome.action || null);
 
         // TODO: Handle specific actions based on outcome.action
         // - SHOW_REGISTRATION_FORM: render signup link
-        // - SHOW_EMAIL_VERIFICATION_PROMPT: render resend button
+        // - SHOW_EMAIL_VERIFICATION_PROMPT: render resend button - complete
         // - CONTACT_SUPPORT: show support email
       }
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    try {
+      await resendVerificationEmail(email);
+    } catch (err) {
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -79,6 +98,20 @@ export default function Login() {
                 aria-live="polite"
               >
                 {error}
+              </div>
+            )}
+
+            {error && errorAction && (
+              <div className={styles['action-prompt']}>
+                {errorAction === 'SHOW_EMAIL_VERIFICATION_PROMPT' && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    className={styles['action-link']}
+                  >
+                    Resend verification email
+                  </button>
+                )}
               </div>
             )}
 
