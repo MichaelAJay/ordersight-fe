@@ -1,3 +1,4 @@
+import { SignedIn, SignedOut } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/common/Button/Button';
 import './Home.css';
@@ -13,13 +14,20 @@ export default function Home() {
       </header>
 
       <section className="landing-cta">
-        <Button variant="primary" size="lg" onClick={() => navigate('/signup')}>
-          Sign Up
-        </Button>
+        <SignedOut>
+          <Button variant="primary" size="lg" onClick={() => navigate('/sign-up')}>
+            Sign Up
+          </Button>
 
-        <Button variant="outline" size="lg" onClick={() => navigate('/login')}>
-          Login
-        </Button>
+          <Button variant="outline" size="lg" onClick={() => navigate('/sign-in')}>
+            Sign In
+          </Button>
+        </SignedOut>
+        <SignedIn>
+          <Button variant="primary" size="lg" onClick={() => navigate('/dashboard')}>
+            Go to Dashboard
+          </Button>
+        </SignedIn>
       </section>
 
       <section className="landing-features">
