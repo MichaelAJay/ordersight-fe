@@ -2,11 +2,12 @@ import { createBrowserRouter } from 'react-router-dom';
 import AuthenticatedLayout from './layout/AuthenticatedLayout';
 import Dashboard from './pages/Dashboard';
 import Home from './pages/Home';
-import { SignIn, SignUp } from '@clerk/clerk-react';
+import { SignIn } from '@clerk/clerk-react';
+import SignUpPage from './pages/auth/SignUpPage';
 
 export const router = createBrowserRouter([
   { path: '/', element: <Home /> },
-  { path: '/sign-up', element: <SignUp routing="path" path="/sign-up" /> },
+  { path: '/sign-up/*', element: <SignUpPage /> },
   { path: '/sign-in', element: <SignIn routing="path" path="/sign-in" /> },
   {
     element: <AuthenticatedLayout />,
