@@ -6,8 +6,8 @@ export default function SignUpPage() {
       <div className="auth-copy">
         <h1>Create your account</h1>
         <p>
-          This sign-up creates your user account and then guides you to create a new organization,
-          where you'll be the admin.
+          This process will walk you through creating a new organization. If you're trying to join
+          an existing organization, ask that organization's administrator to invite you instead.
         </p>
         <p>
           If you're trying to join an existing organization, ask that organization's admin to invite
@@ -21,7 +21,7 @@ export default function SignUpPage() {
       </div>
 
       <div className="auth-card">
-        <SignUp routing="path" path="/sign-up" />
+        <SignUp routing="path" path="/sign-up" forceRedirectUrl="/create-organization" />
       </div>
     </div>
   );
