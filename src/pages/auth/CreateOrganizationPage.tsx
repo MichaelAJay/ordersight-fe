@@ -14,6 +14,7 @@ export default function CreateOrganizationPage() {
           routing="path"
           path="/create-organization"
           afterCreateOrganizationUrl="/onboarding/bootstrap"
+          skipInvitationScreen={true}
         />
       </div>
     </div>
