@@ -1,4 +1,5 @@
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "composite": true, // needed because root tsconfig references this project
     "jsx": "react-jsx", // React 17+ transform (works with React 19)
@@ -8,6 +9,7 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"], // required for Set, Map, and DOM APIs
     "types": ["vite/client"], // Vite env types (import.meta.env.*, etc.)
     "skipLibCheck": true,
+    "emitDeclarationOnly": true,
     "rootDir": "src",
     "outDir": "dist/tsc/app",
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/tsconfig.app.tsbuildinfo"

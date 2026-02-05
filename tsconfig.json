@@ -24,13 +24,8 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "composite": true,
-    "types": ["node", "vitest/importMeta", "vitest/globals"],
-
-    /* === Output control === */
-    "noEmit": true
+    "lib": ["ES2020", "DOM", "DOM.Iterable"]
   },
-  "include": ["src"],
+  "files": [],
   "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
 }
