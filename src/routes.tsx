@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { SignIn } from '@clerk/clerk-react';
-import AuthenticatedLayout from './layout/AuthenticatedLayout';
+import { AuthenticatedLayout } from './layout/AuthenticatedLayout';
 
 export const router = createBrowserRouter([
   {

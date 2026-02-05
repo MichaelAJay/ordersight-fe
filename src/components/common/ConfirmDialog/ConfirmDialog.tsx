@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Button } from '../Button/Button';
 import { Modal } from '../Modal/Modal';
 import styles from './ConfirmDialog.module.css';
@@ -28,7 +28,10 @@ export function ConfirmDialog({
   loading = false,
   error,
 }: Props) {
-  const safeClose = loading ? () => {} : onCancel;
+  const safeClose = useCallback(() => {
+    if (loading) return;
+    onCancel();
+  }, [loading, onCancel]);
   const footer = useMemo(
     () => (
       <>

@@ -59,6 +59,55 @@ export default [
   },
 
   /**
+   * Node-only tooling/config files (Vite/Vitest/ESLint).
+   * These run in Node (ESM), not the browser.
+   */
+  {
+    files: [
+      'eslint.config.js',
+      'vite.config.js',
+      'vitest.config.js',
+      '**/*.config.js',
+      'dev/**/*.js',
+      'scripts/**/*.js',
+    ],
+    languageOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'module',
+      globals: globals.nodeBuiltin,
+    },
+    rules: {
+      'import/no-default-export': 'off',
+    },
+  },
+  {
+    files: [
+      'vite.config.ts',
+      'vitest.config.ts',
+      '**/*.config.ts',
+      'dev/**/*.ts',
+      'scripts/**/*.ts',
+    ],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        ecmaVersion: 2020,
+        sourceType: 'module',
+      },
+      globals: globals.nodeBuiltin,
+    },
+    rules: {
+      'import/no-default-export': 'off',
+    },
+  },
+  {
+    files: ['vite.config.d.ts'],
+    rules: {
+      'import/no-default-export': 'off',
+    },
+  },
+
+  /**
    * ROUTE CODE-SPLITTING GUARDRAILS
    */
   {

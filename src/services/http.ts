@@ -7,7 +7,7 @@ import axios, {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: false,
   timeout: 15_000,
@@ -114,5 +114,3 @@ export async function delJSON<TRes>(url: string, config?: Config): Promise<TRes>
   const res = await api.delete<TRes>(url, config);
   return res.data;
 }
-
-export default api;

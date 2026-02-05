@@ -6,7 +6,9 @@
     "moduleResolution": "bundler", // aligns with Vite/SWC
     "lib": ["ESNext", "DOM", "DOM.Iterable"], // required for Set, Map, and DOM APIs
     "types": ["vite/client"], // Vite env types (import.meta.env.*, etc.)
-    "noEmit": true // Vite handles bundling; tsc is for typechecking only.
+    "rootDir": "src",
+    "outDir": "dist/tsc/app",
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/tsconfig.app.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]

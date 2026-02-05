@@ -2,7 +2,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import './layout.css';
 import { SignedIn, SignedOut, RedirectToSignIn, UserButton } from '@clerk/clerk-react';
 
-export default function AuthenticatedLayout() {
+export function AuthenticatedLayout() {
   return (
     <>
       <SignedIn>

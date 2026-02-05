@@ -11,7 +11,7 @@ import {
   removeMember,
   updateMemberRole,
 } from '../services/membership';
-import BatchInvitePanel from '@/components/members/BatchInvitePanel';
+import { BatchInvitePanel } from '@/components/members/BatchInvitePanel';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog/ConfirmDialog';
 
 type ApiErrorDetails = {

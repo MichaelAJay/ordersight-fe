@@ -170,7 +170,7 @@ function mapResults(results: InviteResult[], requestIds: string[]): InviteOutcom
   }));
 }
 
-export default function BatchInvitePanel({ onInvitesComplete, onAuthRequired }: Props) {
+export function BatchInvitePanel({ onInvitesComplete, onAuthRequired }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const [drafts, setDrafts] = useState<InviteDraft[]>([createDraft()]);

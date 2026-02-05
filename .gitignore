@@ -13,12 +13,6 @@ dist-ssr
 *.local
 *.tsbuildinfo
 
-# TS build output should never land in source dirs (we typecheck with `noEmit`)
-src/**/*.js
-src/**/*.d.ts
-vite.config.js
-vite.config.d.ts
-
 # Environment variables
 .env*
 !.env.example
