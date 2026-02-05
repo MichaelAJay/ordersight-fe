@@ -16,6 +16,7 @@ export default function AuthenticatedLayout() {
           <NavLink to="/menus">Menus</NavLink>
           <NavLink to="/orders">Orders</NavLink>
           <NavLink to="/contacts">Contacts</NavLink>
+          <NavLink to="/members">Members</NavLink>
           <NavLink to="/billing">Billing</NavLink>
           <NavLink to="/audits">Audit Logs</NavLink>
           <UserButton />

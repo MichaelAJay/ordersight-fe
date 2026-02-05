@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { HttpError, postJSON } from '../../services/http';
 
 type BootstrapRequest = {
@@ -18,7 +18,12 @@ type BootstrapResponse = {
 export default function OnboardingBootstrapPage() {
   const { isLoaded, isSignedIn, orgId, userId } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [error, setError] = useState<string | null>(null);
+  const state = (location.state ?? {}) as { returnTo?: string };
+  const params = new URLSearchParams(location.search);
+  const returnTo = state.returnTo ?? params.get('returnTo') ?? '/dashboard';
+  const safeReturnTo = returnTo.startsWith('/') ? returnTo : '/dashboard';
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -38,8 +43,8 @@ export default function OnboardingBootstrapPage() {
 
         await postJSON<BootstrapRequest, BootstrapResponse>('/bootstrap', payload);
 
-        // Upon success, navigate to dashboard
-        navigate('/dashboard', { replace: true });
+        // Upon success, navigate to the intended page (default to dashboard)
+        navigate(safeReturnTo, { replace: true, state: { bootstrapAttempted: true } });
       } catch (err) {
         const normalized = err as HttpError | Error | null;
         const message = normalized?.message ?? 'Bootstrap failed';
@@ -49,7 +54,7 @@ export default function OnboardingBootstrapPage() {
         setError(detailsText ? `${message}\n${detailsText}` : message);
       }
     })();
-  }, [isLoaded, isSignedIn, navigate, orgId, userId]);
+  }, [isLoaded, isSignedIn, navigate, orgId, safeReturnTo, userId]);
 
   return (
     <div className="auth-shell">

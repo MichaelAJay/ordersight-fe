@@ -1,0 +1,9 @@
+.details {
+  margin-bottom: var(--space-3);
+  font-size: 0.95rem;
+}
+
+.error {
+  margin: 0;
+  color: #f87171;
+}
