@@ -11,8 +11,8 @@ import {
   removeMember,
   updateMemberRole,
 } from '../services/membership';
-import BatchInvitePanel from '../components/members/BatchInvitePanel';
-import { ConfirmDialog } from '../components/common/ConfirmDialog/ConfirmDialog';
+import BatchInvitePanel from '@/components/members/BatchInvitePanel';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog/ConfirmDialog';
 
 type ApiErrorDetails = {
   code?: string;
@@ -88,7 +88,7 @@ function getRoleOptions(currentRole: string) {
   ];
 }
 
-export default function MembersPage() {
+export function MembersPage() {
   const { userId: clerkUserId } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();

@@ -1,9 +1,9 @@
 import { SignedIn, SignedOut } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '../components/common/Button/Button';
+import { Button } from '@/components/common/Button/Button';
 import './Home.css';
 
-export default function Home() {
+export function Home() {
   const navigate = useNavigate();
 
   return (

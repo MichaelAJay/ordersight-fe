@@ -68,17 +68,21 @@ export default [
         'error',
         {
           patterns: [
-            './pages/*',
-            './pages/**',
-            '../pages/*',
-            '../pages/**',
-            './features/*',
-            './features/**',
-            '../features/*',
-            '../features/**',
+            {
+              group: [
+                './pages/*',
+                './pages/**',
+                '../pages/*',
+                '../pages/**',
+                './features/*',
+                './features/**',
+                '../features/*',
+                '../features/**',
+              ],
+              message:
+                'Do not eagerly import pages/features in routes.tsx. Use React Router `lazy:` with dynamic import.',
+            },
           ],
-          message:
-            'Do not eagerly import pages/features in routes.tsx. Use React Router `lazy:` with dynamic import.',
         },
       ],
     },
@@ -94,16 +98,20 @@ export default [
         'error',
         {
           patterns: [
-            './components',
-            './components/index',
-            '../components',
-            '../components/index',
-            './features',
-            './features/index',
-            '../features',
-            '../features/index',
+            {
+              group: [
+                './components',
+                './components/index',
+                '../components',
+                '../components/index',
+                './features',
+                './features/index',
+                '../features',
+                '../features/index',
+              ],
+              message: 'Avoid barrel/index hubs. Import directly from module files.',
+            },
           ],
-          message: 'Avoid barrel/index hubs. Import directly from module files.',
         },
       ],
     },

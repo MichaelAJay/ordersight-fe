@@ -15,7 +15,7 @@ type BootstrapResponse = {
   user_id: string;
 };
 
-export default function OnboardingBootstrapPage() {
+export function OnboardingBootstrapPage() {
   const { isLoaded, isSignedIn, orgId, userId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

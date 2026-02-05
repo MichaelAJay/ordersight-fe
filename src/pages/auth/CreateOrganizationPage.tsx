@@ -1,6 +1,6 @@
 import { CreateOrganization } from '@clerk/clerk-react';
 
-export default function CreateOrganizationPage() {
+export function CreateOrganizationPage() {
   return (
     <div className="auth-shell">
       <div className="auth-copy">
