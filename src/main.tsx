@@ -1,26 +1,51 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router } from './routes';
 import './styles/tokens.css';
-import { setOnUnauthorized } from './services/http';
-import { initializeAuth } from './stores/authStore';
+import { ClerkProvider, useAuth } from '@clerk/clerk-react';
+import { setAuthTokenGetter } from './services/http';
 
-// Redirect to /login when the session expires:
-setOnUnauthorized(() => {
-  if (window.location.pathname !== '/login') {
-    window.location.assign('/login');
-  }
-});
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const SIGN_IN_URL = import.meta.env.VITE_CLERK_SIGN_IN_URL ?? '/sign-in';
+const SIGN_UP_URL = import.meta.env.VITE_CLERK_SIGN_UP_URL ?? '/sign-up';
+const SIGN_IN_FALLBACK_REDIRECT_URL = import.meta.env.VITE_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL;
+const SIGN_UP_FALLBACK_REDIRECT_URL = import.meta.env.VITE_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL;
+
+if (!PUBLISHABLE_KEY) {
+  throw new Error('Add your Clerk Publishable Key to the .env file');
+}
 
 const qc = new QueryClient();
-initializeAuth();
+
+function ClerkTokenBridge() {
+  const { getToken } = useAuth();
+
+  useEffect(() => {
+    setAuthTokenGetter(getToken);
+    return () => setAuthTokenGetter(null);
+  }, [getToken]);
+
+  return null;
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={qc}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <ClerkProvider
+      publishableKey={PUBLISHABLE_KEY}
+      signInUrl={SIGN_IN_URL}
+      signUpUrl={SIGN_UP_URL}
+      signInFallbackRedirectUrl={SIGN_IN_FALLBACK_REDIRECT_URL}
+      signUpFallbackRedirectUrl={SIGN_UP_FALLBACK_REDIRECT_URL}
+      taskUrls={{
+        'choose-organization': '/create-organization',
+      }}
+    >
+      <ClerkTokenBridge />
+      <QueryClientProvider client={qc}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </ClerkProvider>
   </React.StrictMode>,
 );

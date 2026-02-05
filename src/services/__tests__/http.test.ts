@@ -1,17 +1,10 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest';
-import type { AxiosInstance, AxiosResponse } from 'axios';
-
-const getMock = vi.fn();
-const postMock = vi.fn();
-const requestMock = vi.fn();
+import type { AxiosInstance } from 'axios';
 
 vi.mock('axios', async () => {
   const actual = await vi.importActual<typeof import('axios')>('axios');
 
-  const instance: Pick<AxiosInstance, 'get' | 'post' | 'request' | 'interceptors'> = {
-    get: getMock,
-    post: postMock,
-    request: requestMock,
+  const instance: Pick<AxiosInstance, 'interceptors'> = {
     interceptors: {
       request: {
         use: vi.fn(),
@@ -45,101 +38,38 @@ vi.mock('axios', async () => {
 
 describe('http interceptors', () => {
   beforeEach(async () => {
-    requestMock.mockReset();
-    getMock.mockReset();
     vi.resetModules();
     await import('../http'); // ensure interceptors register fresh for each test
   });
 
-  test('calls onUnauthorized handler on 401', async () => {
-    const { setOnUnauthorized } = await import('../http');
-    const handler = vi.fn();
-    setOnUnauthorized(handler);
+  test('attaches bearer token when getter is configured', async () => {
+    const { setAuthTokenGetter } = await import('../http');
+    setAuthTokenGetter(async () => 'test-token');
 
     const axios = await import('axios');
     const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-    const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
+    const [requestInterceptor] = instance.interceptors.request.use.mock.calls[0];
 
-    await expect(
-      errorInterceptor({
-        response: { status: 401 },
-        config: { url: '/secure', method: 'get' },
-        message: 'Unauthorized',
-      }),
-    ).rejects.toEqual({
-      status: 401,
-      url: '/secure',
-      method: 'GET',
-      message: 'Unauthorized',
-      details: undefined,
-    });
+    const config = { headers: {} } as Parameters<typeof requestInterceptor>[0];
+    const result = await requestInterceptor(config);
 
-    expect(handler).toHaveBeenCalledTimes(1);
+    expect(result.headers.Authorization).toBe('Bearer test-token');
   });
 
-  test('retries once on CSRF 403', async () => {
-    getMock.mockResolvedValueOnce({ data: { token: 'new-csrf-token' } } as AxiosResponse);
-    requestMock.mockResolvedValueOnce({ data: 'ok' } as AxiosResponse);
+  test('does not override Authorization header', async () => {
+    const { setAuthTokenGetter } = await import('../http');
+    setAuthTokenGetter(async () => 'test-token');
 
     const axios = await import('axios');
     const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-    const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
+    const [requestInterceptor] = instance.interceptors.request.use.mock.calls[0];
 
-    await expect(
-      errorInterceptor({
-        response: { status: 403 },
-        config: { url: '/mutate', method: 'post', headers: {} },
-        message: 'Forbidden',
-      }),
-    ).resolves.toEqual({ data: 'ok' });
-    expect(getMock).toHaveBeenCalledWith('/auth/csrf', { withCredentials: true });
-    expect(requestMock).toHaveBeenCalledTimes(1);
-  });
+    const config = { headers: { Authorization: 'Bearer existing' } } as Parameters<
+      typeof requestInterceptor
+    >[0];
+    const result = await requestInterceptor(config);
 
-  test('does not retry if already retried', async () => {
-    const axios = await import('axios');
-    const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-    const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
-
-    await expect(
-      errorInterceptor({
-        response: { status: 403 },
-        config: { url: '/mutate', method: 'post', headers: {}, _retried: true },
-        message: 'Forbidden',
-      }),
-    ).rejects.toEqual({
-      status: 403,
-      url: '/mutate',
-      method: 'POST',
-      message: 'Forbidden',
-      details: undefined,
-    });
-
-    expect(getMock).not.toHaveBeenCalled();
-    expect(requestMock).not.toHaveBeenCalled();
-  });
-
-  test('does not try CSRF if status not 403 or 419', async () => {
-    const axios = await import('axios');
-    const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
-    const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
-
-    await expect(
-      errorInterceptor({
-        response: { status: 404 },
-        config: { url: '/mutate', method: 'post', headers: {} },
-        message: 'NotFound',
-      }),
-    ).rejects.toEqual({
-      status: 404,
-      url: '/mutate',
-      method: 'POST',
-      message: 'NotFound',
-      details: undefined,
-    });
-
-    expect(getMock).not.toHaveBeenCalled();
-    expect(requestMock).not.toHaveBeenCalled();
+    expect(result.headers.Authorization).toBe('Bearer existing');
   });
 
   test('passes through non-error responses', async () => {
@@ -152,7 +82,25 @@ describe('http interceptors', () => {
     const result = await fulfilledInterceptor(mockResponse);
 
     expect(result).toBe(mockResponse);
-    expect(getMock).not.toHaveBeenCalled();
-    expect(requestMock).not.toHaveBeenCalled();
+  });
+
+  test('normalizes error responses', async () => {
+    const axios = await import('axios');
+    const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
+    const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
+
+    await expect(
+      errorInterceptor({
+        response: { status: 401, data: { message: 'Unauthorized' } },
+        config: { url: '/secure', method: 'get' },
+        message: 'Unauthorized',
+      }),
+    ).rejects.toEqual({
+      status: 401,
+      url: '/secure',
+      method: 'GET',
+      message: 'Unauthorized',
+      details: { message: 'Unauthorized' },
+    });
   });
 });
