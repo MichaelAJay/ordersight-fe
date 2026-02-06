@@ -1,6 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { RedirectToSignIn, useAuth } from '@clerk/clerk-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  Cell,
+  Column,
+  Focusable,
+  ListBox,
+  ListBoxItem,
+  Popover,
+  Row,
+  Select,
+  SelectValue,
+  Table,
+  TableBody,
+  TableHeader,
+  Tooltip,
+  TooltipTrigger,
+} from 'react-aria-components';
 import { HttpError } from '../services/http';
 import {
   listMembers,
@@ -11,7 +27,8 @@ import {
   removeMember,
   updateMemberRole,
 } from '../services/membership';
-import { BatchInvitePanel } from '@/components/members/BatchInvitePanel';
+import { Button } from '@/components/common/Button/Button';
+import { BatchInviteTrigger } from '@/components/members/BatchInviteTrigger';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog/ConfirmDialog';
 
 type ApiErrorDetails = {
@@ -31,6 +48,63 @@ type BootstrapState = {
 const DEFAULT_LIMIT = 50;
 const ROLE_OPTIONS: MemberRole[] = ['super_admin', 'admin', 'staff', 'accountant'];
 const ACTION_MESSAGE_TIMEOUT_MS = 6000;
+const SELECT_POPOVER_STYLE: CSSProperties = {
+  minWidth: 'var(--trigger-width)',
+  background: 'var(--color-bg)',
+  border: '1px solid rgba(148, 163, 184, 0.35)',
+  borderRadius: 'var(--radius-sm)',
+  padding: 'var(--space-2)',
+  boxShadow: '0 16px 40px rgba(0, 0, 0, 0.35)',
+};
+const SELECT_LIST_STYLE: CSSProperties = {
+  display: 'grid',
+  gap: '0.25rem',
+};
+const SELECT_TRIGGER_STYLE: CSSProperties = {
+  width: '100%',
+  justifyContent: 'space-between',
+  display: 'inline-flex',
+  alignItems: 'center',
+};
+const TOOLTIP_STYLE: CSSProperties = {
+  background: 'rgba(15, 23, 42, 0.95)',
+  color: 'white',
+  padding: '0.35rem 0.5rem',
+  borderRadius: 'var(--radius-sm)',
+  fontSize: '0.85rem',
+  maxWidth: '220px',
+};
+const DISABLED_TOOLTIP_TRIGGER_STYLE: CSSProperties = {
+  display: 'inline-flex',
+  width: '100%',
+};
+const DISABLED_TOOLTIP_BUTTON_STYLE: CSSProperties = {
+  pointerEvents: 'none',
+};
+
+type SelectItemStyleProps = {
+  isSelected: boolean;
+  isFocused: boolean;
+  isHovered: boolean;
+  isDisabled: boolean;
+};
+
+const getSelectItemStyle = ({
+  isSelected,
+  isFocused,
+  isHovered,
+  isDisabled,
+}: SelectItemStyleProps): CSSProperties => ({
+  padding: '0.35rem 0.5rem',
+  borderRadius: 'var(--radius-sm)',
+  background: isSelected
+    ? 'rgba(59, 130, 246, 0.2)'
+    : isHovered || isFocused
+      ? 'rgba(148, 163, 184, 0.18)'
+      : 'transparent',
+  color: isDisabled ? 'rgba(148, 163, 184, 0.7)' : 'inherit',
+  cursor: isDisabled ? 'not-allowed' : 'default',
+});
 
 type RoleUpdateState = {
   draftRole: string;
@@ -449,7 +523,7 @@ export function MembersPage() {
   return (
     <section>
       <h1>Members</h1>
-      <BatchInvitePanel
+      <BatchInviteTrigger
         onInvitesComplete={() => setRefreshToken((prev) => prev + 1)}
         onAuthRequired={() => setNeedsAuth(true)}
       />
@@ -484,9 +558,14 @@ export function MembersPage() {
         <div>
           <p role="alert">{errorMessage}</p>
           {!notFound && (
-            <button type="button" onClick={() => setRefreshToken((prev) => prev + 1)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onPress={() => setRefreshToken((prev) => prev + 1)}
+            >
               Retry
-            </button>
+            </Button>
           )}
         </div>
       ) : null}
@@ -494,95 +573,134 @@ export function MembersPage() {
       {!loading && !errorMessage && members.length > 0 ? (
         <>
           {pageSummary ? <p>{pageSummary}</p> : null}
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((member) => (
-                <tr key={member.membership.user_id}>
-                  <td>{getDisplayName(member)}</td>
-                  <td>{getEmail(member)}</td>
-                  <td>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <select
-                        value={
-                          roleUpdates[member.membership.user_id]?.draftRole ??
-                          member.membership.role
-                        }
-                        onChange={(event) => handleRoleUpdate(member, event.target.value)}
-                        disabled={roleUpdates[member.membership.user_id]?.saving}
-                        aria-label={`Role for ${getDisplayName(member)}`}
-                      >
-                        {getRoleOptions(member.membership.role).map((option) => (
-                          <option
-                            key={option.value}
-                            value={option.value}
-                            disabled={option.disabled}
+          <Table aria-label="Members" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <TableHeader>
+              <Column isRowHeader>Name</Column>
+              <Column>Email</Column>
+              <Column>Role</Column>
+              <Column>Status</Column>
+              <Column>Actions</Column>
+            </TableHeader>
+            <TableBody items={members} dependencies={[roleUpdates, deleteStates, clerkUserId]}>
+              {(member) => {
+                const roleState = roleUpdates[member.membership.user_id];
+                const deleteState = deleteStates[member.membership.user_id];
+                const roleOptions = getRoleOptions(member.membership.role);
+                const currentRole = roleState?.draftRole ?? member.membership.role;
+                const roleSaving = roleState?.saving ?? false;
+                const roleError = roleState?.error;
+                const isSelf = isSelfMember(member, clerkUserId);
+
+                return (
+                  <Row id={member.membership.user_id}>
+                    <Cell>{getDisplayName(member)}</Cell>
+                    <Cell>{getEmail(member)}</Cell>
+                    <Cell>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <Select
+                          aria-label={`Role for ${getDisplayName(member)}`}
+                          value={currentRole}
+                          onChange={(value) => handleRoleUpdate(member, value ? String(value) : '')}
+                          isDisabled={roleSaving}
+                          isInvalid={Boolean(roleError)}
+                        >
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            block
+                            style={{
+                              ...SELECT_TRIGGER_STYLE,
+                              borderColor: roleError ? '#f87171' : undefined,
+                            }}
+                            isDisabled={roleSaving}
                           >
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      {roleUpdates[member.membership.user_id]?.saving ? (
-                        <span>Saving...</span>
-                      ) : null}
-                      {roleUpdates[member.membership.user_id]?.error ? (
-                        <span role="alert">{roleUpdates[member.membership.user_id]?.error}</span>
-                      ) : null}
-                    </div>
-                  </td>
-                  <td>{member.membership.status}</td>
-                  <td>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => openRemovalDialog(member)}
-                        disabled={
-                          deleteStates[member.membership.user_id]?.deleting ||
-                          isSelfMember(member, clerkUserId)
-                        }
-                      >
-                        {deleteStates[member.membership.user_id]?.deleting
-                          ? 'Removing...'
-                          : 'Remove'}
-                      </button>
-                      {isSelfMember(member, clerkUserId) ? (
-                        <span>You cannot remove yourself.</span>
-                      ) : null}
-                      {deleteStates[member.membership.user_id]?.error ? (
-                        <span role="alert">{deleteStates[member.membership.user_id]?.error}</span>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                            <SelectValue />
+                          </Button>
+                          <Popover style={SELECT_POPOVER_STYLE}>
+                            <ListBox items={roleOptions} style={SELECT_LIST_STYLE}>
+                              {(option) => (
+                                <ListBoxItem
+                                  id={option.value}
+                                  textValue={option.label}
+                                  isDisabled={option.disabled}
+                                  style={getSelectItemStyle}
+                                >
+                                  {option.label}
+                                </ListBoxItem>
+                              )}
+                            </ListBox>
+                          </Popover>
+                        </Select>
+                        {roleSaving ? <span>Saving...</span> : null}
+                        {roleError ? <span role="alert">{roleError}</span> : null}
+                      </div>
+                    </Cell>
+                    <Cell>{member.membership.status}</Cell>
+                    <Cell>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        {isSelf ? (
+                          <TooltipTrigger>
+                            <Focusable>
+                              <span
+                                role="button"
+                                aria-label="Remove disabled"
+                                aria-disabled="true"
+                                style={DISABLED_TOOLTIP_TRIGGER_STYLE}
+                              >
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  block
+                                  isDisabled
+                                  style={DISABLED_TOOLTIP_BUTTON_STYLE}
+                                >
+                                  Remove
+                                </Button>
+                              </span>
+                            </Focusable>
+                            <Tooltip style={TOOLTIP_STYLE}>You cannot remove yourself.</Tooltip>
+                          </TooltipTrigger>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onPress={() => openRemovalDialog(member)}
+                            isDisabled={deleteState?.deleting}
+                          >
+                            {deleteState?.deleting ? 'Removing...' : 'Remove'}
+                          </Button>
+                        )}
+                        {deleteState?.error ? <span role="alert">{deleteState?.error}</span> : null}
+                      </div>
+                    </Cell>
+                  </Row>
+                );
+              }}
+            </TableBody>
+          </Table>
         </>
       ) : null}
       {pagination && !loading && !errorMessage ? (
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-          <button
+          <Button
             type="button"
-            disabled={pagination.offset === 0}
-            onClick={() => setOffset(Math.max(0, pagination.offset - pagination.limit))}
+            variant="outline"
+            isDisabled={pagination.offset === 0}
+            onPress={() => setOffset(Math.max(0, pagination.offset - pagination.limit))}
           >
             Previous
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            disabled={pagination.offset + pagination.limit >= pagination.total}
-            onClick={() => setOffset(pagination.offset + pagination.limit)}
+            variant="outline"
+            isDisabled={pagination.offset + pagination.limit >= pagination.total}
+            onPress={() => setOffset(pagination.offset + pagination.limit)}
           >
             Next
-          </button>
+          </Button>
         </div>
       ) : null}
     </section>

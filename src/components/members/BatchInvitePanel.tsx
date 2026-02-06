@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import {
+  ListBox,
+  ListBoxItem,
+  Popover,
+  Select,
+  SelectValue,
+  Tooltip,
+  TooltipTrigger,
+} from 'react-aria-components';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { HttpError } from '../../services/http';
 import {
@@ -8,6 +17,7 @@ import {
   MemberRole,
   inviteMembers,
 } from '../../services/membership';
+import { Button } from '../common/Button/Button';
 import styles from './BatchInvitePanel.module.css';
 
 type ApiErrorDetails = {
@@ -54,12 +64,69 @@ type ExpiryInfo = {
 type Props = {
   onInvitesComplete?: (results: InviteResult[]) => void;
   onAuthRequired?: () => void;
+  onRequestClose?: () => void;
+  closeLabel?: string;
 };
 
 const ROLE_OPTIONS: MemberRole[] = ['admin', 'staff', 'accountant'];
 const DEFAULT_ROLE: MemberRole = 'staff';
 const NEAR_EXPIRY_MS = 48 * 60 * 60 * 1000;
 const REFRESH_INTERVAL_MS = 60 * 1000;
+const ROLE_DESCRIPTIONS: Record<MemberRole, string> = {
+  admin: 'Full access to manage members and settings.',
+  staff: 'Standard access to day-to-day operations.',
+  accountant: 'Read-only access to financial reports.',
+};
+const SELECT_POPOVER_STYLE: CSSProperties = {
+  minWidth: 'var(--trigger-width)',
+  background: 'var(--color-bg)',
+  border: '1px solid rgba(148, 163, 184, 0.35)',
+  borderRadius: 'var(--radius-sm)',
+  padding: 'var(--space-2)',
+  boxShadow: '0 16px 40px rgba(0, 0, 0, 0.35)',
+};
+const SELECT_LIST_STYLE: CSSProperties = {
+  display: 'grid',
+  gap: '0.25rem',
+};
+const SELECT_TRIGGER_STYLE: CSSProperties = {
+  width: '100%',
+  justifyContent: 'space-between',
+  display: 'inline-flex',
+  alignItems: 'center',
+};
+const TOOLTIP_STYLE: CSSProperties = {
+  background: 'rgba(15, 23, 42, 0.95)',
+  color: 'white',
+  padding: '0.35rem 0.5rem',
+  borderRadius: 'var(--radius-sm)',
+  fontSize: '0.85rem',
+  maxWidth: '240px',
+};
+
+type SelectItemStyleProps = {
+  isSelected: boolean;
+  isFocused: boolean;
+  isHovered: boolean;
+  isDisabled: boolean;
+};
+
+const getSelectItemStyle = ({
+  isSelected,
+  isFocused,
+  isHovered,
+  isDisabled,
+}: SelectItemStyleProps): CSSProperties => ({
+  padding: '0.35rem 0.5rem',
+  borderRadius: 'var(--radius-sm)',
+  background: isSelected
+    ? 'rgba(59, 130, 246, 0.2)'
+    : isHovered || isFocused
+      ? 'rgba(148, 163, 184, 0.18)'
+      : 'transparent',
+  color: isDisabled ? 'rgba(148, 163, 184, 0.7)' : 'inherit',
+  cursor: isDisabled ? 'not-allowed' : 'default',
+});
 
 const createId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -170,7 +237,12 @@ function mapResults(results: InviteResult[], requestIds: string[]): InviteOutcom
   }));
 }
 
-export function BatchInvitePanel({ onInvitesComplete, onAuthRequired }: Props) {
+export function BatchInvitePanel({
+  onInvitesComplete,
+  onAuthRequired,
+  onRequestClose,
+  closeLabel = 'Close',
+}: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const [drafts, setDrafts] = useState<InviteDraft[]>([createDraft()]);
@@ -355,12 +427,24 @@ export function BatchInvitePanel({ onInvitesComplete, onAuthRequired }: Props) {
           </p>
         </div>
         <div className={styles.actions}>
-          <button type="button" onClick={addDraft} disabled={submitting}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onPress={addDraft}
+            isDisabled={submitting}
+          >
             Add row
-          </button>
-          <button type="button" onClick={resetForm} disabled={submitting}>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onPress={resetForm}
+            isDisabled={submitting}
+          >
             Clear
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -395,23 +479,56 @@ export function BatchInvitePanel({ onInvitesComplete, onAuthRequired }: Props) {
                     {errors?.email ? <div className={styles.errorText}>{errors.email}</div> : null}
                   </td>
                   <td>
-                    <select
-                      className={`${styles.input} ${errors?.role ? styles.inputError : ''}`}
+                    <Select
+                      aria-label={`Role for ${draft.email || 'invite'}`}
                       value={draft.role}
-                      onChange={(event) => updateDraft(draft.id, 'role', event.target.value)}
+                      onChange={(value) =>
+                        updateDraft(draft.id, 'role', value ? String(value) : '')
+                      }
+                      isDisabled={submitting}
+                      isInvalid={Boolean(errors?.role)}
                     >
-                      {ROLE_OPTIONS.map((role) => (
-                        <option key={role} value={role}>
-                          {formatRole(role)}
-                        </option>
-                      ))}
-                    </select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        block
+                        style={{
+                          ...SELECT_TRIGGER_STYLE,
+                          borderColor: errors?.role ? '#f87171' : undefined,
+                        }}
+                        isDisabled={submitting}
+                      >
+                        <SelectValue />
+                      </Button>
+                      <Popover style={SELECT_POPOVER_STYLE}>
+                        <ListBox style={SELECT_LIST_STYLE}>
+                          {ROLE_OPTIONS.map((role) => (
+                            <TooltipTrigger key={role}>
+                              <ListBoxItem
+                                id={role}
+                                textValue={formatRole(role)}
+                                style={getSelectItemStyle}
+                              >
+                                {formatRole(role)}
+                              </ListBoxItem>
+                              <Tooltip style={TOOLTIP_STYLE}>{ROLE_DESCRIPTIONS[role]}</Tooltip>
+                            </TooltipTrigger>
+                          ))}
+                        </ListBox>
+                      </Popover>
+                    </Select>
                     {errors?.role ? <div className={styles.errorText}>{errors.role}</div> : null}
                   </td>
                   <td className={styles.rowActions}>
-                    <button type="button" onClick={() => removeDraft(draft.id)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onPress={() => removeDraft(draft.id)}
+                    >
                       Remove
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               );
@@ -421,10 +538,14 @@ export function BatchInvitePanel({ onInvitesComplete, onAuthRequired }: Props) {
       </div>
 
       <div className={styles.footer}>
-        <button type="button" onClick={handleSubmit} disabled={submitting}>
-          {submitting ? 'Sending invites...' : 'Send batch invites'}
-        </button>
-        <span className={styles.hintText}>Roles supported: admin, staff, accountant.</span>
+        <Button type="button" onPress={handleSubmit} isDisabled={submitting}>
+          {submitting ? 'Sending invites...' : 'Send'}
+        </Button>
+        {onRequestClose ? (
+          <Button type="button" variant="outline" onPress={onRequestClose} isDisabled={submitting}>
+            {closeLabel}
+          </Button>
+        ) : null}
       </div>
 
       {summary ? (
@@ -481,13 +602,15 @@ export function BatchInvitePanel({ onInvitesComplete, onAuthRequired }: Props) {
                     </td>
                     <td className={styles.rowActions}>
                       {showRetry ? (
-                        <button
+                        <Button
                           type="button"
-                          onClick={() => handleRetry(outcome)}
-                          disabled={!canRetry || retryingId === outcome.id || submitting}
+                          variant="outline"
+                          size="sm"
+                          onPress={() => handleRetry(outcome)}
+                          isDisabled={!canRetry || retryingId === outcome.id || submitting}
                         >
                           {canRetry ? 'Retry invite' : 'Retry after expiration'}
-                        </button>
+                        </Button>
                       ) : null}
                     </td>
                   </tr>
