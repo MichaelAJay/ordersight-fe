@@ -6,7 +6,7 @@ export function AuthenticatedLayout() {
   return (
     <>
       <SignedIn>
-        <a href="#main-content" className="skip-link" id="main-content" tabIndex={-1}>
+        <a href="#main-content" className="skip-link" tabIndex={-1}>
           Skip to main content
         </a>
 
