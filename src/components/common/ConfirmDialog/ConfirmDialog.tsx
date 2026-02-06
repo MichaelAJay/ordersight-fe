@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
+import { Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import { Button } from '../Button/Button';
-import { Modal } from '../Modal/Modal';
+import modalStyles from '../Modal/Modal.module.css';
 import styles from './ConfirmDialog.module.css';
 
 type Props = {
@@ -47,20 +48,51 @@ export function ConfirmDialog({
   );
 
   return (
-    <Modal
+    <ModalOverlay
       isOpen={isOpen}
-      onClose={safeClose}
-      title={title}
-      description={description}
-      footer={footer}
-      closeOnBackdrop={!loading}
+      className={modalStyles.overlay}
+      isDismissable={!loading}
+      onOpenChange={(open) => {
+        if (!open) safeClose();
+      }}
     >
-      {details ? <div className={styles.details}>{details}</div> : null}
-      {error ? (
-        <p role="alert" className={styles.error}>
-          {error}
-        </p>
-      ) : null}
-    </Modal>
+      <Modal className={modalStyles.dialog}>
+        <Dialog>
+          {({ close }) => (
+            <>
+              <div className={modalStyles.header}>
+                <div>
+                  <Heading slot="title" className={modalStyles.title}>
+                    {title}
+                  </Heading>
+                  {description ? (
+                    <p slot="description" className={modalStyles.description}>
+                      {description}
+                    </p>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  className={modalStyles.closeButton}
+                  onPress={close}
+                  aria-label="Close dialog"
+                >
+                  ×
+                </Button>
+              </div>
+              <div className={modalStyles.body}>
+                {details ? <div className={styles.details}>{details}</div> : null}
+                {error ? (
+                  <p role="alert" className={styles.error}>
+                    {error}
+                  </p>
+                ) : null}
+              </div>
+              <div className={modalStyles.footer}>{footer}</div>
+            </>
+          )}
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
   );
 }
