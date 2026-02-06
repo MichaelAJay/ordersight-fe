@@ -15,16 +15,16 @@ export function Home() {
 
       <section className="landing-cta">
         <SignedOut>
-          <Button variant="primary" size="lg" onClick={() => navigate('/sign-up')}>
+          <Button variant="primary" size="lg" onPress={() => navigate('/sign-up')}>
             Sign Up
           </Button>
 
-          <Button variant="outline" size="lg" onClick={() => navigate('/sign-in')}>
+          <Button variant="outline" size="lg" onPress={() => navigate('/sign-in')}>
             Sign In
           </Button>
         </SignedOut>
         <SignedIn>
-          <Button variant="primary" size="lg" onClick={() => navigate('/dashboard')}>
+          <Button variant="primary" size="lg" onPress={() => navigate('/dashboard')}>
             Go to Dashboard
           </Button>
         </SignedIn>

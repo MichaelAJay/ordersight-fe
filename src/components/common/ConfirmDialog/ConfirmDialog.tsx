@@ -35,10 +35,10 @@ export function ConfirmDialog({
   const footer = useMemo(
     () => (
       <>
-        <Button type="button" variant="outline" onClick={safeClose} disabled={loading}>
+        <Button type="button" variant="outline" onPress={safeClose} isDisabled={loading}>
           {cancelLabel}
         </Button>
-        <Button type="button" variant="primary" onClick={onConfirm} disabled={loading}>
+        <Button type="button" variant="primary" onPress={onConfirm} isDisabled={loading}>
           {loading ? 'Working...' : confirmLabel}
         </Button>
       </>
