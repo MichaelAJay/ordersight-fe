@@ -15,6 +15,7 @@ declare const styles: {
   readonly tabList: string;
   readonly tab: string;
   readonly tabPanel: string;
+  readonly profileStack: string;
   readonly placeholder: string;
   readonly placeholderTitle: string;
   readonly placeholderText: string;

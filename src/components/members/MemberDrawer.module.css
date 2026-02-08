@@ -173,6 +173,11 @@
   padding: var(--space-4);
 }
 
+.profileStack {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .placeholder {
   border-radius: var(--radius-sm);
   border: 1px dashed rgba(148, 163, 184, 0.35);

@@ -177,6 +177,43 @@ export async function updateMemberRole(
   return patchJSON<UpdateRoleRequest, MembershipRecord>(`/members/${memberId}/role`, { role });
 }
 
+export interface UpdateMemberEmailRequest {
+  email: string;
+}
+
+export async function updateMemberEmail(memberId: string, email: string): Promise<MemberDetail> {
+  return patchJSON<UpdateMemberEmailRequest, MemberDetail>(`/members/${memberId}/email`, {
+    email,
+  });
+}
+
+export async function listMemberStoreAssignments(
+  memberId: string,
+): Promise<MemberStoreAssignment[]> {
+  return getJSON<MemberStoreAssignment[]>(`/members/${memberId}/store-assignments`);
+}
+
+export interface AddMemberStoreAssignmentRequest {
+  store_id: string;
+}
+
+export async function addMemberStoreAssignment(
+  memberId: string,
+  storeId: string,
+): Promise<MemberStoreAssignment> {
+  return postJSON<AddMemberStoreAssignmentRequest, MemberStoreAssignment>(
+    `/members/${memberId}/store-assignments`,
+    { store_id: storeId },
+  );
+}
+
+export async function removeMemberStoreAssignment(
+  memberId: string,
+  storeId: string,
+): Promise<void> {
+  await delJSON<void>(`/members/${memberId}/store-assignments/${storeId}`);
+}
+
 export async function removeMember(memberId: string): Promise<void> {
   await delJSON<void>(`/members/${memberId}`);
 }

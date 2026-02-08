@@ -15,9 +15,12 @@ import {
   type MemberDetail,
   type MemberRole,
   type MemberStatus,
+  type MemberStoreAssignment,
+  type MembershipRecord,
   type MemberWithUser,
 } from '../../services/membership';
 import { Button } from '../common/Button/Button';
+import { AdminProfileExtensions } from './AdminProfileExtensions';
 import { MemberRoleBadge } from './MemberRoleBadge';
 import { MemberStatusBadge } from './MemberStatusBadge';
 import { MemberProfileBase } from './MemberProfileBase';
@@ -222,6 +225,25 @@ export function MemberDrawer({ isOpen, member, onClose, viewerRole }: MemberDraw
   const isSelf = detail?.is_self ?? false;
   const avatarUrl = displayMember?.user.image_url ?? null;
   const showLoading = loading || (!detail && !error);
+  const canManageMembers = viewerRole === 'admin' || viewerRole === 'super_admin';
+
+  const handleMemberDetailUpdate = useCallback((updated: MemberDetail) => {
+    setDetail(updated);
+  }, []);
+
+  const handleMembershipUpdate = useCallback((updated: MembershipRecord) => {
+    setDetail((prev) => {
+      if (!prev) return prev;
+      return { ...prev, membership: { ...prev.membership, ...updated } };
+    });
+  }, []);
+
+  const handleAssignmentsUpdate = useCallback((nextAssignments: MemberStoreAssignment[]) => {
+    setDetail((prev) => {
+      if (!prev) return prev;
+      return { ...prev, store_assignments: nextAssignments };
+    });
+  }, []);
 
   const tabContent = useMemo(() => {
     if (showLoading) return <LoadingPanel />;
@@ -304,7 +326,21 @@ export function MemberDrawer({ isOpen, member, onClose, viewerRole }: MemberDraw
               </Tab>
             </TabList>
             <TabPanel id="profile" className={styles.tabPanel}>
-              {tabContent ?? <MemberProfileBase member={detail ?? displayMember} />}
+              {tabContent ?? (
+                <div className={styles.profileStack}>
+                  <MemberProfileBase member={detail ?? displayMember} />
+                  {canManageMembers && detail ? (
+                    <AdminProfileExtensions
+                      member={detail}
+                      viewerRole={viewerRole}
+                      displayName={getDisplayName(displayMember)}
+                      onMemberDetailUpdate={handleMemberDetailUpdate}
+                      onMembershipUpdate={handleMembershipUpdate}
+                      onAssignmentsUpdate={handleAssignmentsUpdate}
+                    />
+                  ) : null}
+                </div>
+              )}
             </TabPanel>
             <TabPanel id="activity" className={styles.tabPanel}>
               {tabContent ?? (
