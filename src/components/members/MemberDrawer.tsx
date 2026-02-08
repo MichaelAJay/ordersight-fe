@@ -20,6 +20,7 @@ import {
 import { Button } from '../common/Button/Button';
 import { MemberRoleBadge } from './MemberRoleBadge';
 import { MemberStatusBadge } from './MemberStatusBadge';
+import { MemberProfileBase } from './MemberProfileBase';
 import styles from './MemberDrawer.module.css';
 
 type MemberDrawerProps = {
@@ -303,12 +304,7 @@ export function MemberDrawer({ isOpen, member, onClose, viewerRole }: MemberDraw
               </Tab>
             </TabList>
             <TabPanel id="profile" className={styles.tabPanel}>
-              {tabContent ?? (
-                <PlaceholderPanel
-                  title="Profile"
-                  description="Profile details will appear here in FE-MEMBERS-004."
-                />
-              )}
+              {tabContent ?? <MemberProfileBase member={detail ?? displayMember} />}
             </TabPanel>
             <TabPanel id="activity" className={styles.tabPanel}>
               {tabContent ?? (
