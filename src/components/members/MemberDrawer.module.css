@@ -178,6 +178,408 @@
   gap: var(--space-3);
 }
 
+.auditPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.auditHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.auditTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.auditSubtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.auditBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.auditFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.auditFilter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.auditFilterLabel {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.auditSelectTrigger {
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 160px;
+}
+
+.auditSelectValue {
+  text-transform: capitalize;
+}
+
+.auditSelectCaret {
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.auditSelectPopover {
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  padding: var(--space-2);
+}
+
+.auditListBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  outline: none;
+}
+
+.auditListItem {
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.auditListItem[data-selected],
+.auditListItem[data-focused] {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.auditListItem[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dateRangePicker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dateRangeGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.12);
+}
+
+.dateRangeGroup[data-focus-within] {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 1px;
+}
+
+.dateRangeGroup[data-disabled] {
+  opacity: 0.6;
+}
+
+.dateInput {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.dateSegment {
+  padding: 0 0.1rem;
+}
+
+.dateSegment[data-placeholder] {
+  opacity: 0.5;
+}
+
+.dateRangeSeparator {
+  opacity: 0.6;
+}
+
+.dateRangeButton {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.dateRangePopover {
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  padding: var(--space-3);
+}
+
+.rangeCalendar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.calendarHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.calendarHeading {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.calendarNavButton {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.calendarGrid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.calendarGrid :global(.react-aria-CalendarHeaderCell) {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+.calendarCell {
+  width: 32px;
+  height: 32px;
+  text-align: center;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.calendarCell[data-outside-month],
+.calendarCell[data-outside-visible-range] {
+  opacity: 0.3;
+}
+
+.calendarCell[data-disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.calendarCell[data-selected] {
+  background: rgba(59, 130, 246, 0.45);
+  color: #fff;
+}
+
+.calendarCell[data-range-selection]:not([data-selection-start]):not([data-selection-end]) {
+  background: rgba(59, 130, 246, 0.2);
+  color: inherit;
+  border-radius: 0;
+}
+
+.calendarCell[data-selection-start],
+.calendarCell[data-selection-end] {
+  background: rgba(59, 130, 246, 0.6);
+  color: #fff;
+}
+
+.auditLoading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.auditSkeletonRow {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.auditSkeletonIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.auditSkeletonLines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.auditSkeletonLine {
+  height: 0.7rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.15) 0%,
+    rgba(148, 163, 184, 0.35) 50%,
+    rgba(148, 163, 184, 0.15) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.timelineEntry {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: var(--space-3);
+}
+
+.timelineMarker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.timelineIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  background: rgba(148, 163, 184, 0.2);
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.auditIconSecurity {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.auditIconOrders {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.auditIconSettings {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fde68a;
+}
+
+.auditIconMembership {
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+}
+
+.auditIconStore {
+  background: rgba(244, 63, 94, 0.2);
+  color: #fda4af;
+}
+
+.auditIconDefault {
+  background: rgba(148, 163, 184, 0.2);
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.timelineLine {
+  flex: 1;
+  width: 2px;
+  background: rgba(148, 163, 184, 0.25);
+  margin-top: 0.4rem;
+}
+
+.timelineEntry[data-last='true'] .timelineLine {
+  display: none;
+}
+
+.timelineContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.timelineMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.timelineCategory {
+  font-weight: 600;
+}
+
+.timelineTime {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.timelineAction {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.timelineActor {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.auditError {
+  color: #f87171;
+  font-size: 0.9rem;
+}
+
+.auditEmpty,
+.auditRestricted {
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.18);
+  padding: var(--space-4);
+  text-align: center;
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.loadMoreRow {
+  display: flex;
+  justify-content: center;
+}
+
 .placeholder {
   border-radius: var(--radius-sm);
   border: 1px dashed rgba(148, 163, 184, 0.35);
@@ -275,6 +677,22 @@
   }
 
   .placeholder {
+    background: rgba(226, 232, 240, 0.4);
+  }
+
+  .dateRangeGroup {
+    background: rgba(226, 232, 240, 0.35);
+    border-color: rgba(15, 23, 42, 0.12);
+  }
+
+  .auditSelectPopover,
+  .dateRangePopover {
+    border-color: rgba(15, 23, 42, 0.12);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.15);
+  }
+
+  .auditEmpty,
+  .auditRestricted {
     background: rgba(226, 232, 240, 0.4);
   }
 

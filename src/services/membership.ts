@@ -92,6 +92,60 @@ export async function getMemberDetail(memberId: string): Promise<MemberDetail> {
   return getJSON<MemberDetail>(`/members/${memberId}`);
 }
 
+export type AuditCategory = 'security' | 'orders' | 'settings' | 'membership' | 'store' | string;
+
+export interface AuditEntry {
+  id: string;
+  timestamp: string;
+  action: string;
+  actor_type: string;
+  actor_id?: string | null;
+  actor_name: string;
+  target_type: string;
+  target_id?: string | null;
+  target_name: string;
+  category: AuditCategory;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MemberAuditResponse {
+  data: AuditEntry[];
+  next_cursor?: string | null;
+}
+
+export interface MemberAuditParams {
+  category?: string;
+  after?: string;
+  before?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export async function getMemberAudit(
+  memberId: string,
+  params?: MemberAuditParams,
+): Promise<MemberAuditResponse> {
+  const query = new URLSearchParams();
+  if (params?.category) {
+    query.set('category', params.category);
+  }
+  if (params?.after) {
+    query.set('after', params.after);
+  }
+  if (params?.before) {
+    query.set('before', params.before);
+  }
+  if (params?.limit !== undefined) {
+    query.set('limit', String(params.limit));
+  }
+  if (params?.cursor) {
+    query.set('cursor', params.cursor);
+  }
+
+  const suffix = query.toString();
+  return getJSON<MemberAuditResponse>(`/members/${memberId}/audit${suffix ? `?${suffix}` : ''}`);
+}
+
 export interface InviteRequest {
   email: string;
   role: MemberRole;
