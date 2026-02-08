@@ -1,0 +1,60 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.checkboxCell {
+  width: 2rem;
+}
+
+.tableBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-transform: lowercase;
+  background: rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.statusBadge {
+  text-transform: lowercase;
+}
+
+.statusPending {
+  background: rgba(251, 191, 36, 0.18);
+  border-color: rgba(251, 191, 36, 0.4);
+  color: rgba(253, 230, 138, 0.95);
+}
+
+.statusAccepted {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: rgba(134, 239, 172, 0.95);
+}
+
+.statusRevoked {
+  background: rgba(248, 113, 113, 0.15);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: rgba(254, 202, 202, 0.95);
+}
+
+.statusExpired {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: inherit;
+}
+
+.statusUnknown {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: inherit;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

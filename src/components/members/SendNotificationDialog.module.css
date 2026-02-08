@@ -1,0 +1,37 @@
+.toLine {
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: var(--space-3);
+}
+
+.label {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: transparent;
+  color: inherit;
+}
+
+.input:focus,
+.textarea:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.5);
+  outline-offset: 1px;
+}
+
+.error {
+  color: #f87171;
+  font-size: 0.85rem;
+}

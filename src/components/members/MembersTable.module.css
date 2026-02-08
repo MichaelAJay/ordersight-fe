@@ -1,0 +1,140 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rowClickable {
+  cursor: pointer;
+}
+
+.rowClickable:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.checkboxCell {
+  width: 2rem;
+}
+
+.memberCell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: rgba(59, 130, 246, 0.18);
+  color: rgba(191, 219, 254, 0.95);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.memberMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.memberName {
+  font-weight: 600;
+}
+
+.selfBadge {
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: rgba(191, 219, 254, 0.95);
+}
+
+.tableBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-transform: lowercase;
+  background: rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.roleBadge {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: rgba(191, 219, 254, 0.95);
+}
+
+.statusBadge {
+  text-transform: lowercase;
+}
+
+.statusActive {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: rgba(134, 239, 172, 0.95);
+}
+
+.statusSuspended {
+  background: rgba(248, 113, 113, 0.15);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: rgba(254, 202, 202, 0.95);
+}
+
+.statusUnknown {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: inherit;
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.skeletonBar {
+  height: 0.85rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.15) 0%,
+    rgba(148, 163, 184, 0.35) 50%,
+    rgba(148, 163, 184, 0.15) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.skeletonCircle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.2) 0%,
+    rgba(148, 163, 184, 0.4) 50%,
+    rgba(148, 163, 184, 0.2) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

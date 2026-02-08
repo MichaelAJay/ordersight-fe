@@ -1,0 +1,29 @@
+declare const styles: {
+  readonly overlay: string;
+  readonly drawer: string;
+  readonly dialog: string;
+  readonly header: string;
+  readonly identity: string;
+  readonly avatar: string;
+  readonly avatarImage: string;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly metaRow: string;
+  readonly headerActions: string;
+  readonly kebabButton: string;
+  readonly tabs: string;
+  readonly tabList: string;
+  readonly tab: string;
+  readonly tabPanel: string;
+  readonly placeholder: string;
+  readonly placeholderTitle: string;
+  readonly placeholderText: string;
+  readonly loading: string;
+  readonly skeletonBar: string;
+  readonly error: string;
+  readonly menuPopover: string;
+  readonly menu: string;
+  readonly menuItem: string;
+};
+
+export default styles;
