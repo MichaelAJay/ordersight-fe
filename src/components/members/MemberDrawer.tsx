@@ -330,7 +330,6 @@ function MemberActionsMenu({
                 className={styles.menuItem}
                 isDisabled={item.disabled}
                 aria-label={item.disabledReason ?? item.label}
-                title={item.disabledReason}
               >
                 {item.label}
               </MenuItem>

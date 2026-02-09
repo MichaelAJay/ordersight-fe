@@ -79,6 +79,9 @@ declare const styles: {
   readonly menuPopover: string;
   readonly menu: string;
   readonly menuItem: string;
+  readonly actionMessage: string;
+  readonly confirmDetails: string;
+  readonly confirmLabel: string;
 };
 
 export default styles;
