@@ -54,6 +54,10 @@ function isSelfMember(member: MemberWithUser, clerkUserId: string | null | undef
   return member.user.clerk_user_id === clerkUserId;
 }
 
+function isDeactivatedMember(member: MemberWithUser) {
+  return member.membership.status?.toLowerCase() === 'disabled';
+}
+
 const skeletonRows = Array.from({ length: 6 }, (_, index) => ({
   id: `skeleton-${index}`,
 }));
@@ -135,12 +139,16 @@ export function MembersTable({
           {(member) => {
             const displayName = getDisplayName(member);
             const isSelf = isSelfMember(member, currentUserId);
+            const isDeactivated = isDeactivatedMember(member);
+            const rowClasses = [
+              onRowAction ? styles.rowClickable : '',
+              isDeactivated ? styles.rowDeactivated : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
 
             return (
-              <Row
-                id={member.membership.user_id}
-                className={onRowAction ? styles.rowClickable : undefined}
-              >
+              <Row id={member.membership.user_id} className={rowClasses || undefined}>
                 {enableSelection ? (
                   <Cell className={styles.checkboxCell}>
                     <SelectionCheckbox slot="selection" label={`Select ${displayName}`} />

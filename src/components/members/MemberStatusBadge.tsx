@@ -7,7 +7,7 @@ type MemberStatusBadgeProps = {
 function formatStatusLabel(status?: string | null) {
   if (!status) return 'unknown';
   const normalized = status.replace(/_/g, ' ').toLowerCase();
-  if (normalized === 'disabled') return 'suspended';
+  if (normalized === 'disabled') return 'deactivated';
   return normalized;
 }
 

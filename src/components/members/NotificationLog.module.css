@@ -1,0 +1,144 @@
+.log {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.logItem {
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.18);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.logHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.subject {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.timestamp {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.metaLabel {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.2);
+  text-transform: lowercase;
+  font-size: 0.75rem;
+}
+
+.badge[data-tone='success'] {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.15);
+  color: rgba(134, 239, 172, 0.95);
+}
+
+.badge[data-tone='error'] {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.15);
+  color: rgba(254, 202, 202, 0.95);
+}
+
+.badge[data-tone='info'] {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.15);
+  color: rgba(191, 219, 254, 0.95);
+}
+
+.empty {
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.18);
+  padding: var(--space-4);
+  text-align: center;
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.error {
+  color: #f87171;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.loadMoreRow {
+  display: flex;
+  justify-content: center;
+}
+
+.skeletonRow {
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.18);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.skeletonLine {
+  height: 0.85rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.15) 0%,
+    rgba(148, 163, 184, 0.35) 50%,
+    rgba(148, 163, 184, 0.15) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .logItem,
+  .skeletonRow {
+    border-color: rgba(15, 23, 42, 0.12);
+    background: rgba(226, 232, 240, 0.4);
+  }
+
+  .empty {
+    background: rgba(226, 232, 240, 0.4);
+  }
+}

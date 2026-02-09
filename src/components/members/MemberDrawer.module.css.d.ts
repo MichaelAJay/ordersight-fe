@@ -66,6 +66,7 @@ declare const styles: {
   readonly timelineAction: string;
   readonly timelineActor: string;
   readonly auditError: string;
+  readonly auditErrorBanner: string;
   readonly auditEmpty: string;
   readonly auditRestricted: string;
   readonly loadMoreRow: string;

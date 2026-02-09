@@ -11,6 +11,10 @@
   background: rgba(148, 163, 184, 0.08);
 }
 
+.rowDeactivated {
+  opacity: 0.6;
+}
+
 .checkboxCell {
   width: 2rem;
 }

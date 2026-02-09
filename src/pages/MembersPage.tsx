@@ -89,6 +89,8 @@ export function MembersPage() {
   );
   const [inviteActionMessage, setInviteActionMessage] = useState<ActionMessage>(null);
   const [memberActionMessage, setMemberActionMessage] = useState<ActionMessage>(null);
+  const [deactivatedMemberCount, setDeactivatedMemberCount] = useState<number | null>(null);
+  const [includeDeactivated, setIncludeDeactivated] = useState(false);
   const [pendingUninvite, setPendingUninvite] = useState<InviteWithDecrypted | null>(null);
   const [pendingBulkUninvite, setPendingBulkUninvite] = useState<InviteWithDecrypted[] | null>(
     null,
@@ -186,6 +188,7 @@ export function MembersPage() {
         const response: MemberSummaryResponse = await getMemberSummary({
           limit: DEFAULT_LIMIT,
           offset,
+          include_deactivated: includeDeactivated,
         });
 
         if (!active) return;
@@ -193,6 +196,7 @@ export function MembersPage() {
         setMembers(response.members?.members ?? []);
         setPagination(response.members?.pagination ?? null);
         setInviteBadgeCount(response.pending_invite_ct ?? 0);
+        setDeactivatedMemberCount(response.deactivated_member_ct ?? 0);
       } catch (err) {
         if (!active) return;
 
@@ -254,7 +258,14 @@ export function MembersPage() {
     return () => {
       active = false;
     };
-  }, [locationState.bootstrapAttempted, navigate, offset, redirectUrl, refreshToken]);
+  }, [
+    includeDeactivated,
+    locationState.bootstrapAttempted,
+    navigate,
+    offset,
+    redirectUrl,
+    refreshToken,
+  ]);
 
   useEffect(() => {
     setMemberSelection(new Set());
@@ -377,6 +388,12 @@ export function MembersPage() {
     const timer = window.setTimeout(() => setMemberActionMessage(null), ACTION_MESSAGE_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
   }, [memberActionMessage]);
+
+  useEffect(() => {
+    if (deactivatedMemberCount === 0 && includeDeactivated) {
+      setIncludeDeactivated(false);
+    }
+  }, [deactivatedMemberCount, includeDeactivated]);
 
   const updateInviteActionState = (inviteId: string, next: Partial<InviteActionState>) => {
     setInviteActionStates((prev) => ({
@@ -883,6 +900,15 @@ export function MembersPage() {
     setIsDrawerOpen(true);
   };
 
+  const handleIncludeDeactivatedChange = (nextValue: boolean) => {
+    setIncludeDeactivated(nextValue);
+    setOffset(0);
+  };
+
+  const handleMemberUpdated = () => {
+    setRefreshToken((prev) => prev + 1);
+  };
+
   const closeDrawer = () => {
     setIsDrawerOpen(false);
     setSelectedMember(null);
@@ -923,6 +949,8 @@ export function MembersPage() {
             member={selectedMember}
             viewerRole={currentMember?.membership.role ?? null}
             onClose={closeDrawer}
+            onMemberUpdated={handleMemberUpdated}
+            onActionMessage={setMemberActionMessage}
           />
           <SendNotificationDialog
             key={sendNotificationOpen ? 'send-open' : 'send-closed'}
@@ -949,6 +977,23 @@ export function MembersPage() {
             </div>
           ) : null}
           {memberActionMessage ? <p role="status">{memberActionMessage.text}</p> : null}
+          {deactivatedMemberCount && deactivatedMemberCount > 0 ? (
+            <div className={styles.deactivatedWarning} role="status">
+              <strong className={styles.deactivatedWarningTitle}>Deactivated members</strong>
+              <p className={styles.deactivatedWarningText}>
+                {deactivatedMemberCount} member{deactivatedMemberCount === 1 ? '' : 's'} are
+                deactivated. Reactivating a member consumes a seat, so ensure seats are available.
+              </p>
+              <label className={styles.deactivatedToggle}>
+                <input
+                  type="checkbox"
+                  checked={includeDeactivated}
+                  onChange={(event) => handleIncludeDeactivatedChange(event.target.checked)}
+                />
+                <span>Include deactivated members</span>
+              </label>
+            </div>
+          ) : null}
           {loading && !errorMessage ? (
             <MembersTable
               members={[]}

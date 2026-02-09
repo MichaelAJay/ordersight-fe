@@ -120,6 +120,38 @@
   font-weight: 600;
 }
 
+.deactivatedWarning {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.12);
+  margin-bottom: var(--space-3);
+}
+
+.deactivatedWarningTitle {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.deactivatedWarningText {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.deactivatedToggle {
+  margin-top: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.deactivatedToggle input {
+  accent-color: var(--color-primary);
+}
+
 .filterCopy {
   display: flex;
   flex-direction: column;

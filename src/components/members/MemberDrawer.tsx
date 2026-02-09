@@ -25,8 +25,10 @@ import {
 } from 'react-aria-components';
 import { HttpError } from '../../services/http';
 import {
+  forceMemberReauth,
   getMemberAudit,
   getMemberDetail,
+  removeMember,
   type AuditCategory,
   type AuditEntry,
   type MemberDetail,
@@ -35,9 +37,12 @@ import {
   type MemberStoreAssignment,
   type MembershipRecord,
   type MemberWithUser,
+  updateMemberStatus,
 } from '../../services/membership';
 import { Button } from '../common/Button/Button';
+import { ConfirmDialog } from '../common/ConfirmDialog/ConfirmDialog';
 import { AdminProfileExtensions } from './AdminProfileExtensions';
+import { MemberNotificationsTab } from './MemberNotificationsTab';
 import { MemberRoleBadge } from './MemberRoleBadge';
 import { MemberStatusBadge } from './MemberStatusBadge';
 import { MemberProfileBase } from './MemberProfileBase';
@@ -48,7 +53,15 @@ type MemberDrawerProps = {
   member: MemberWithUser | null;
   onClose: () => void;
   viewerRole?: MemberRole | null;
+  onMemberUpdated?: () => void;
+  onActionMessage?: (message: ActionMessage) => void;
 };
+
+type ActionMessageTone = 'info' | 'error' | 'success';
+type ActionMessage = {
+  tone: ActionMessageTone;
+  text: string;
+} | null;
 
 type MemberActionsMenuProps = {
   viewerRole?: MemberRole | null;
@@ -56,6 +69,10 @@ type MemberActionsMenuProps = {
   targetStatus?: MemberStatus | null;
   isSelf?: boolean;
   isLoading?: boolean;
+  onSuspend: () => void;
+  onUnsuspend: () => void;
+  onRemove: () => void;
+  onForceReauth: () => void;
 };
 
 type AuditCategoryFilter = 'all' | 'security' | 'orders' | 'settings' | 'membership';
@@ -171,11 +188,27 @@ function getErrorMessage(error: unknown, fallback: string) {
 function getAuditErrorMessage(error: unknown, fallback: string) {
   const normalized = error as HttpError | Error | null;
   const httpError = normalized as HttpError;
-  const code = (httpError?.details as { code?: string } | undefined)?.code;
-  if (httpError?.status === 501 || code === 'not_implemented') {
-    return 'Audit activity is not available yet.';
+  if (httpError?.status && httpError.status >= 500) {
+    return fallback;
   }
   return getErrorMessage(error, fallback);
+}
+
+type NormalizedAuditResponse = {
+  data: AuditEntry[];
+  nextCursor: string | null;
+  valid: boolean;
+};
+
+function normalizeAuditResponse(
+  result: { data?: AuditEntry[]; next_cursor?: string | null } | null | undefined,
+): NormalizedAuditResponse {
+  if (!result || !Array.isArray(result.data)) {
+    return { data: [], nextCursor: null, valid: false };
+  }
+  const nextCursor =
+    typeof result.next_cursor === 'string' && result.next_cursor.trim() ? result.next_cursor : null;
+  return { data: result.data, nextCursor, valid: true };
 }
 
 function MemberActionsMenu({
@@ -184,6 +217,10 @@ function MemberActionsMenu({
   targetStatus,
   isSelf = false,
   isLoading = false,
+  onSuspend,
+  onUnsuspend,
+  onRemove,
+  onForceReauth,
 }: MemberActionsMenuProps) {
   const canManage = viewerRole === 'admin' || viewerRole === 'super_admin';
   if (!canManage) return null;
@@ -193,6 +230,32 @@ function MemberActionsMenu({
   const isSuspended = status === 'disabled' || status === 'suspended';
   const isTargetSuperAdmin = targetRole === 'super_admin';
   const baseDisabled = isLoading;
+
+  type ActionKey = 'suspend' | 'unsuspend' | 'remove' | 'force-reauth';
+  type MenuItemConfig = {
+    id: ActionKey;
+    label: string;
+    show: boolean;
+    disabled: boolean;
+    disabledReason?: string;
+  };
+
+  const getDisabledReason = (actionId: ActionKey) => {
+    if (baseDisabled) return 'Member details are still loading.';
+    if (isSelf) {
+      if (actionId === 'force-reauth') {
+        return 'You cannot force re-authentication on yourself.';
+      }
+      return 'You cannot perform this action on yourself.';
+    }
+    if (isTargetSuperAdmin && (actionId === 'suspend' || actionId === 'unsuspend')) {
+      return 'Cannot suspend the organization owner.';
+    }
+    if (isTargetSuperAdmin && actionId === 'remove') {
+      return 'Cannot remove the organization owner.';
+    }
+    return undefined;
+  };
 
   const items = [
     {
@@ -219,9 +282,21 @@ function MemberActionsMenu({
       show: isActive,
       disabled: baseDisabled || isSelf,
     },
-  ];
+  ] satisfies MenuItemConfig[];
 
-  const visibleItems = items.filter((item) => item.show);
+  const visibleItems = items
+    .filter((item) => item.show)
+    .map((item) => ({
+      ...item,
+      disabledReason: item.disabled ? getDisabledReason(item.id) : undefined,
+    }));
+
+  const actionMap: Record<ActionKey, () => void> = {
+    suspend: onSuspend,
+    unsuspend: onUnsuspend,
+    remove: onRemove,
+    'force-reauth': onForceReauth,
+  };
 
   return (
     <MenuTrigger>
@@ -232,10 +307,17 @@ function MemberActionsMenu({
         className={styles.kebabButton}
         aria-label="Member actions"
       >
-        ...
+        ⋯
       </Button>
       <Popover className={styles.menuPopover} placement="bottom end">
-        <Menu className={styles.menu} aria-label="Member actions">
+        <Menu
+          className={styles.menu}
+          aria-label="Member actions"
+          onAction={(key) => {
+            const action = actionMap[String(key) as ActionKey];
+            if (action) action();
+          }}
+        >
           {visibleItems.length === 0 ? (
             <MenuItem id="no-actions" className={styles.menuItem} isDisabled>
               No actions available
@@ -247,6 +329,8 @@ function MemberActionsMenu({
                 id={item.id}
                 className={styles.menuItem}
                 isDisabled={item.disabled}
+                aria-label={item.disabledReason ?? item.label}
+                title={item.disabledReason}
               >
                 {item.label}
               </MenuItem>
@@ -255,15 +339,6 @@ function MemberActionsMenu({
         </Menu>
       </Popover>
     </MenuTrigger>
-  );
-}
-
-function PlaceholderPanel({ title, description }: { title: string; description: string }) {
-  return (
-    <div className={styles.placeholder}>
-      <h3 className={styles.placeholderTitle}>{title}</h3>
-      <p className={styles.placeholderText}>{description}</p>
-    </div>
   );
 }
 
@@ -517,9 +592,18 @@ function MemberAuditTimeline({ memberId, viewerRole }: MemberAuditTimelineProps)
         const result = await getMemberAudit(memberId, params);
         if (requestIdRef.current !== requestId) return;
 
-        const data = result?.data ?? [];
-        setEntries((prev) => (isAppend ? [...prev, ...data] : data));
-        setNextCursor(result?.next_cursor ?? null);
+        const normalized = normalizeAuditResponse(result);
+        if (!normalized.valid) {
+          setError('Unexpected response while loading activity.');
+          if (!isAppend) {
+            setEntries([]);
+            setNextCursor(null);
+          }
+          return;
+        }
+
+        setEntries((prev) => (isAppend ? [...prev, ...normalized.data] : normalized.data));
+        setNextCursor(normalized.nextCursor);
       } catch (err) {
         if (requestIdRef.current !== requestId) return;
         setError(getAuditErrorMessage(err, 'Unable to load activity.'));
@@ -557,6 +641,14 @@ function MemberAuditTimeline({ memberId, viewerRole }: MemberAuditTimelineProps)
     loadAudit({ cursor: nextCursor, append: true });
   };
 
+  const handleRetry = () => {
+    if (loading) return;
+    loadAudit({ append: false });
+  };
+
+  const showErrorBanner = Boolean(error) && entries.length > 0;
+  const showInlineError = Boolean(error) && entries.length === 0;
+
   return (
     <div className={styles.auditPanel}>
       <div className={styles.auditHeader}>
@@ -586,11 +678,34 @@ function MemberAuditTimeline({ memberId, viewerRole }: MemberAuditTimelineProps)
       </div>
 
       <div className={styles.auditBody}>
+        {showErrorBanner ? (
+          <div className={styles.auditErrorBanner} role="alert">
+            <span>{error}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onPress={handleRetry}
+              isDisabled={loading || loadingMore}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : null}
         {loading ? (
           <AuditLoading />
-        ) : error ? (
+        ) : showInlineError ? (
           <div className={styles.auditError} role="alert">
-            {error}
+            <span>{error}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onPress={handleRetry}
+              isDisabled={loading || loadingMore}
+            >
+              Retry
+            </Button>
           </div>
         ) : entries.length === 0 ? (
           <div className={styles.auditEmpty}>No activity matching filters.</div>
@@ -624,12 +739,27 @@ function MemberAuditTimeline({ memberId, viewerRole }: MemberAuditTimelineProps)
   );
 }
 
-export function MemberDrawer({ isOpen, member, onClose, viewerRole }: MemberDrawerProps) {
+export function MemberDrawer({
+  isOpen,
+  member,
+  onClose,
+  viewerRole,
+  onMemberUpdated,
+  onActionMessage,
+}: MemberDrawerProps) {
   const lastMemberRef = useRef<MemberWithUser | null>(null);
   const requestIdRef = useRef(0);
   const [detail, setDetail] = useState<MemberDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<ActionMessage>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<
+    'suspend' | 'unsuspend' | 'remove' | 'force-reauth' | null
+  >(null);
+  const [actionLoading, setActionLoading] = useState<
+    'suspend' | 'unsuspend' | 'remove' | 'force-reauth' | null
+  >(null);
   const memberId = member?.membership.user_id ?? null;
 
   if (member) {
@@ -647,11 +777,13 @@ export function MemberDrawer({ isOpen, member, onClose, viewerRole }: MemberDraw
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  const loadMember = useCallback(async (id: string) => {
+  const loadMember = useCallback(async (id: string, options?: { reset?: boolean }) => {
     const requestId = (requestIdRef.current += 1);
     setLoading(true);
     setError(null);
-    setDetail(null);
+    if (options?.reset !== false) {
+      setDetail(null);
+    }
 
     try {
       const data = await getMemberDetail(id);
@@ -675,6 +807,21 @@ export function MemberDrawer({ isOpen, member, onClose, viewerRole }: MemberDraw
     loadMember(memberId);
   }, [isOpen, memberId, loadMember]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setPendingAction(null);
+      setActionError(null);
+      setActionLoading(null);
+      setActionMessage(null);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!actionMessage) return;
+    const timer = window.setTimeout(() => setActionMessage(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [actionMessage]);
+
   const overlayState = isOpen ? 'open' : 'closed';
   const displayMember = detail ?? member ?? lastMemberRef.current;
 
@@ -686,6 +833,8 @@ export function MemberDrawer({ isOpen, member, onClose, viewerRole }: MemberDraw
   const avatarUrl = displayMember?.user.image_url ?? null;
   const showLoading = loading || (!detail && !error);
   const canManageMembers = viewerRole === 'admin' || viewerRole === 'super_admin';
+  const displayName = displayMember ? getDisplayName(displayMember) : 'this member';
+  const storeAssignmentCount = detail?.store_assignments?.length;
 
   const handleMemberDetailUpdate = useCallback((updated: MemberDetail) => {
     setDetail(updated);
@@ -717,7 +866,127 @@ export function MemberDrawer({ isOpen, member, onClose, viewerRole }: MemberDraw
     return null;
   }, [error, showLoading]);
 
+  const emitActionMessage = useCallback(
+    (message: ActionMessage) => {
+      setActionMessage(message);
+      onActionMessage?.(message);
+    },
+    [onActionMessage],
+  );
+
+  const closePendingAction = useCallback(() => {
+    if (actionLoading) return;
+    setPendingAction(null);
+    setActionError(null);
+  }, [actionLoading]);
+
+  const openPendingAction = useCallback(
+    (action: 'suspend' | 'unsuspend' | 'remove' | 'force-reauth') => {
+      if (actionLoading) return;
+      setActionError(null);
+      setPendingAction(action);
+    },
+    [actionLoading],
+  );
+
+  const refreshMember = useCallback(async () => {
+    if (!memberId) return;
+    await loadMember(memberId, { reset: false });
+  }, [loadMember, memberId]);
+
+  const handleStatusChange = useCallback(
+    async (nextStatus: 'active' | 'disabled') => {
+      if (!memberId) return;
+      const actionKey = nextStatus === 'disabled' ? 'suspend' : 'unsuspend';
+      setActionLoading(actionKey);
+      setActionError(null);
+
+      try {
+        const updated = await updateMemberStatus(memberId, nextStatus);
+        setDetail(updated);
+        emitActionMessage({
+          tone: 'success',
+          text:
+            nextStatus === 'disabled'
+              ? `Suspended ${displayName}.`
+              : `Restored ${displayName}'s access.`,
+        });
+        setPendingAction(null);
+        onMemberUpdated?.();
+        await refreshMember();
+      } catch (err) {
+        setActionError(
+          getErrorMessage(
+            err,
+            nextStatus === 'disabled' ? 'Unable to suspend member.' : 'Unable to unsuspend member.',
+          ),
+        );
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [displayName, emitActionMessage, memberId, onMemberUpdated, refreshMember],
+  );
+
+  const handleForceReauth = useCallback(async () => {
+    if (!memberId) return;
+    setActionLoading('force-reauth');
+    setActionError(null);
+
+    try {
+      await forceMemberReauth(memberId);
+      emitActionMessage({
+        tone: 'success',
+        text: `Forced ${displayName} to sign in again.`,
+      });
+      setPendingAction(null);
+      onMemberUpdated?.();
+      await refreshMember();
+    } catch (err) {
+      setActionError(getErrorMessage(err, 'Unable to force re-authentication.'));
+    } finally {
+      setActionLoading(null);
+    }
+  }, [displayName, emitActionMessage, memberId, onMemberUpdated, refreshMember]);
+
+  const handleRemoveMember = useCallback(async () => {
+    if (!memberId) return;
+    setActionLoading('remove');
+    setActionError(null);
+
+    try {
+      await removeMember(memberId);
+      emitActionMessage({
+        tone: 'success',
+        text: `${displayName} has been removed from the organization.`,
+      });
+      setPendingAction(null);
+      onMemberUpdated?.();
+      onClose();
+    } catch (err) {
+      setActionError(getErrorMessage(err, 'Unable to remove member.'));
+    } finally {
+      setActionLoading(null);
+    }
+  }, [displayName, emitActionMessage, memberId, onClose, onMemberUpdated]);
+
   if (!displayMember) return null;
+
+  const removeDetails = (
+    <div className={styles.confirmDetails}>
+      <p>
+        <span className={styles.confirmLabel}>Store assignments:</span>{' '}
+        {storeAssignmentCount === undefined
+          ? 'Loading...'
+          : storeAssignmentCount === 0
+            ? 'None'
+            : `${storeAssignmentCount} store${storeAssignmentCount === 1 ? '' : 's'}`}
+      </p>
+      <p>
+        <span className={styles.confirmLabel}>Pending order assignments:</span> Not available
+      </p>
+    </div>
+  );
 
   return (
     <div
@@ -762,13 +1031,22 @@ export function MemberDrawer({ isOpen, member, onClose, viewerRole }: MemberDraw
                 targetRole={targetRole}
                 targetStatus={targetStatus}
                 isSelf={isSelf}
-                isLoading={loading}
+                isLoading={loading || actionLoading !== null}
+                onSuspend={() => openPendingAction('suspend')}
+                onUnsuspend={() => openPendingAction('unsuspend')}
+                onRemove={() => openPendingAction('remove')}
+                onForceReauth={() => openPendingAction('force-reauth')}
               />
               <Button type="button" variant="outline" size="sm" onPress={onClose}>
                 Close
               </Button>
             </div>
           </header>
+          {actionMessage ? (
+            <div className={styles.actionMessage} data-tone={actionMessage.tone} role="status">
+              {actionMessage.text}
+            </div>
+          ) : null}
           <Tabs
             key={memberId ?? 'member-drawer'}
             className={styles.tabs}
@@ -811,15 +1089,61 @@ export function MemberDrawer({ isOpen, member, onClose, viewerRole }: MemberDraw
             ) : null}
             <TabPanel id="notifications" className={styles.tabPanel}>
               {tabContent ?? (
-                <PlaceholderPanel
-                  title="Notifications"
-                  description="Notification history will appear here in FE-MEMBERS-008."
+                <MemberNotificationsTab
+                  memberId={memberId}
+                  memberName={displayName}
+                  canSend={canManageMembers}
                 />
               )}
             </TabPanel>
           </Tabs>
         </div>
       </section>
+
+      <ConfirmDialog
+        isOpen={pendingAction === 'suspend'}
+        title={`Suspend ${displayName}?`}
+        description={`This will immediately log out ${displayName} and prevent access.`}
+        confirmLabel="Suspend member"
+        onConfirm={() => handleStatusChange('disabled')}
+        onCancel={closePendingAction}
+        loading={actionLoading === 'suspend'}
+        error={actionError}
+      />
+
+      <ConfirmDialog
+        isOpen={pendingAction === 'unsuspend'}
+        title={`Restore ${displayName}'s access?`}
+        description={`This will restore ${displayName}'s access to the organization.`}
+        confirmLabel="Restore access"
+        onConfirm={() => handleStatusChange('active')}
+        onCancel={closePendingAction}
+        loading={actionLoading === 'unsuspend'}
+        error={actionError}
+      />
+
+      <ConfirmDialog
+        isOpen={pendingAction === 'force-reauth'}
+        title={`Force ${displayName} to re-authenticate?`}
+        description={`This will revoke all active sessions. ${displayName} will need to log in again.`}
+        confirmLabel="Force re-auth"
+        onConfirm={handleForceReauth}
+        onCancel={closePendingAction}
+        loading={actionLoading === 'force-reauth'}
+        error={actionError}
+      />
+
+      <ConfirmDialog
+        isOpen={pendingAction === 'remove'}
+        title={`Remove ${displayName}?`}
+        description={`This will permanently remove ${displayName} from the organization. They will lose access to all stores and data.`}
+        details={removeDetails}
+        confirmLabel="Remove member"
+        onConfirm={handleRemoveMember}
+        onCancel={closePendingAction}
+        loading={actionLoading === 'remove'}
+        error={actionError}
+      />
     </div>
   );
 }

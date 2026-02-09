@@ -86,7 +86,7 @@ The existing backend backlog (EPIC-004, STORY-027–030) covers basic member CRU
 | Member      | Avatar/initials + full name                  | Yes (by last name) | Primary column               |
 | Email       | Primary email                                | Yes                |                              |
 | Role        | Badge: super_admin, admin, accountant, staff | Yes                |                              |
-| Status      | Badge: active, suspended                     | Yes                | Default filter: active only  |
+| Status      | Badge: active, deactivated                   | Yes                | Default filter: active only  |
 | Last Active | Relative timestamp                           | Yes                | "2h ago", "3d ago", etc.     |
 | Joined      | Date                                         | Yes                | `created_at` from membership |
 
@@ -95,7 +95,7 @@ The existing backend backlog (EPIC-004, STORY-027–030) covers basic member CRU
 - [x] Table renders org members with all columns above
 - [ ] Pagination: cursor-based, configurable page size (default 20)
 - [ ] Default sort: last name ascending
-- [ ] Default filter: status = active (toggle to include suspended)
+- [ ] Default filter: status = active (toggle to include deactivated)
 - [ ] Filter by role (multi-select)
 - [ ] Search by name or email (debounced, 300ms)
 - [x] Row click opens member drawer (FE-MEMBERS-003 - is placeholder)
@@ -112,7 +112,7 @@ This route exists as STORY-027 but needs the following additions. It is a super-
 - [ ] Query params: `?status=active`, `?role=admin,staff`, `?search=`, `?limit=20`, `?cursor=`
 - [ ] Response includes `last_active_at` (from Clerk session metadata, synced periodically or on-demand)
 - [ ] Response shape:
-      `{ members: { data: Member[], next_cursor: string | null, total_count: number }, pending_invite_ct: number }`
+      `{ members: { data: Member[], next_cursor: string | null, total_count: number }, pending_invite_ct: number, active_member_ct: number, deactivated_member_ct: number }`
 - [ ] `total_count` is the filtered total (for "Showing X of Y" UI text)
 - [ ] Scoped by `org_id` (enforced by Org middleware)
 
@@ -237,11 +237,11 @@ This route exists as STORY-027 but needs the following additions. It is a super-
 
 **Backend Dependency — `GET /api/v1/members/:id` (New):**
 
-- [ ] Returns full member detail: user info (decrypted name, email), role, status, `created_at`, `last_active_at`, store assignments
-- [ ] Scoped by `org_id`
-- [ ] Non-member target returns 404
-- [ ] Includes `store_assignments: [{ store_id, store_name }]` (join through `store_memberships` → `stores`)
-- [ ] Includes `is_self: boolean` flag (compare `request.user_id == target.user_id`)
+- [x] Returns full member detail: user info (decrypted name, email), role, status, `created_at`, `last_active_at`, store assignments
+- [x] Scoped by `org_id`
+- [x] Non-member target returns 404
+- [x] Includes `store_assignments: [{ store_id, store_name }]` (join through `store_memberships` → `stores`)
+- [x] Includes `is_self: boolean` flag (compare `request.user_id == target.user_id`)
 
 ---
 
@@ -268,11 +268,11 @@ This route exists as STORY-027 but needs the following additions. It is a super-
 
 **Acceptance Criteria:**
 
-- [ ] Renders as a clean card/section with label-value rows
-- [ ] Name shows lock icon indicating it's user-managed
-- [ ] Exports `MemberProfileBase` for use in both admin and store drawers
-- [ ] Accepts `member` data prop — no internal fetching
-- [ ] Responsive: adjusts layout for narrow drawer width
+- [x] Renders as a clean card/section with label-value rows
+- [x] Name shows lock icon indicating it's user-managed
+- [x] Exports `MemberProfileBase` for use in both admin and store drawers
+- [x] Accepts `member` data prop — no internal fetching
+- [x] Responsive: adjusts layout for narrow drawer width
 
 ---
 
@@ -314,20 +314,20 @@ This route exists as STORY-027 but needs the following additions. It is a super-
 
 **Acceptance Criteria:**
 
-- [ ] Role select only shows roles the current user can assign per `CanManageRole`
-- [ ] Role select disabled for super_admin target (tooltip: "Use Transfer Ownership to change the organization owner")
-- [ ] Role select disabled for self (tooltip: "You cannot change your own role")
-- [ ] Email edit validates format client-side before submit
-- [ ] Email edit shows server-side errors (duplicate, invalid)
-- [ ] Store assignments list is scrollable if many stores
-- [ ] Adding/removing store assignment updates immediately with optimistic UI + rollback on error
+- [x] Role select only shows roles the current user can assign per `CanManageRole`
+- [x] Role select disabled for super_admin target (tooltip: "Use Transfer Ownership to change the organization owner")
+- [x] Role select disabled for self (tooltip: "You cannot change your own role")
+- [x] Email edit validates format client-side before submit
+- [x] Email edit shows server-side errors (duplicate, invalid)
+- [x] Store assignments list is scrollable if many stores
+- [x] Adding/removing store assignment updates immediately with optimistic UI + rollback on error
 - [ ] All changes logged to audit on the backend
 
 **Backend Dependency — `PATCH /api/v1/members/:id/email` (New):**
 
 - [ ] Accepts `{ email: string }`
 - [ ] Admin+ only (RequireAdmin middleware)
-- [ ] Cannot change own email through this endpoint (use Clerk account settings)
+- [ ] Admins may update their own email through this endpoint
 - [ ] Validates email format, checks uniqueness within org (via `email_norm_hash`)
 - [ ] Updates Clerk user's primary email via Clerk Backend API
 - [ ] Updates local encrypted PII + hash
@@ -425,6 +425,8 @@ This route exists as STORY-027 but needs the following additions. It is a super-
 
 **Description:** Implement the kebab (⋯) actions menu in the drawer header. Actions are context-dependent based on the target member's role/status and the viewer's relationship to the target.
 
+**Status:** In progress (backend + core UI done; audit logging + UX polish remaining)
+
 **Component Structure:**
 
 - `MemberActionsMenu` — RAC `MenuTrigger` + `Menu` + `MenuItem`
@@ -443,35 +445,35 @@ This route exists as STORY-027 but needs the following additions. It is a super-
 
 **Acceptance Criteria:**
 
-- [ ] Kebab menu only appears for admin+ viewers
-- [ ] Menu items show/hide based on action matrix above
-- [ ] Disabled items show tooltip explaining why (e.g., "Cannot suspend the organization owner")
-- [ ] Suspend: sets member status to `disabled`, triggers Clerk session revocation
-- [ ] Unsuspend: sets member status to `active`
-- [ ] Remove: deletes membership (with cascade), shows impact summary in dialog (number of store assignments, pending order assignments if applicable)
-- [ ] Force Re-auth: revokes Clerk sessions without changing member status
-- [ ] All actions show success toast on completion
-- [ ] All actions update drawer state (re-fetch member detail)
-- [ ] Self-view: kebab menu items that target self are disabled, not hidden
+- [x] Kebab menu only appears for admin+ viewers
+- [x] Menu items show/hide based on action matrix above
+- [x] Disabled items show tooltip explaining why (e.g., "Cannot suspend the organization owner")
+- [x] Suspend: sets member status to `disabled`, triggers Clerk session revocation
+- [x] Unsuspend: sets member status to `active`
+- [ ] Remove: deletes membership (with cascade), shows impact summary in dialog (store assignments shown; pending order assignments TBD)
+- [x] Force Re-auth: revokes Clerk sessions without changing member status
+- [ ] All actions show success toast on completion (currently inline status message)
+- [x] All actions update drawer state (re-fetch member detail)
+- [x] Self-view: kebab menu items that target self are disabled, not hidden
 
 **Backend Dependency — `PATCH /api/v1/members/:id/status` (New):**
 
-- [ ] Accepts `{ status: "active" | "disabled" }`
-- [ ] Admin+ only
-- [ ] Cannot change super_admin status (check constraint will reject, but validate app-side too)
-- [ ] Cannot change own status
-- [ ] When suspending: calls Clerk Backend API to revoke all user sessions in this org
-- [ ] Logged to audit: action=`member_suspended` or `member_unsuspended`
-- [ ] Returns updated member
+- [x] Accepts `{ status: "active" | "disabled" }`
+- [x] Admin+ only
+- [x] Cannot change super_admin status (check constraint will reject, but validate app-side too)
+- [x] Cannot change own status
+- [x] When suspending: calls Clerk Backend API to revoke all user sessions in this org
+- [x] Logged to audit: action=`member_suspended` or `member_unsuspended`
+- [x] Returns updated member
 
 **Backend Dependency — `POST /api/v1/members/:id/force-reauth` (New):**
 
-- [ ] Admin+ only
-- [ ] Cannot target self
-- [ ] Calls Clerk Backend API to revoke all sessions for user
-- [ ] Does NOT change member status (member remains active)
-- [ ] Logged to audit: action=`member_sessions_revoked`
-- [ ] Returns `{ success: true }`
+- [x] Admin+ only
+- [x] Cannot target self
+- [x] Calls Clerk Backend API to revoke all sessions for user
+- [x] Does NOT change member status (member remains active)
+- [x] Logged to audit: action=`member_sessions_revoked`
+- [x] Returns `{ success: true }`
 
 ---
 
@@ -482,6 +484,7 @@ This route exists as STORY-027 but needs the following additions. It is a super-
 | 3      | Medium   | frontend, members, drawer, notifications |
 
 **Description:** Build the Notifications tab in the admin member drawer. Shows history of notifications sent to this member and provides a "Send Notification" action targeting just this member.
+**Status:** ✅ Complete
 
 **Component Structure:**
 
@@ -491,12 +494,12 @@ This route exists as STORY-027 but needs the following additions. It is a super-
 
 **Acceptance Criteria:**
 
-- [ ] Shows list of notifications previously sent to this member (reverse chronological)
-- [ ] Each entry: subject, date sent, channel (email), status (sent/failed)
-- [ ] "Send Notification" button at top opens the compose dialog, pre-populated with this member as sole recipient
-- [ ] Reuses `SendNotificationDialog` from bulk actions
-- [ ] Empty state: "No notifications sent to this member yet"
-- [ ] Pagination or "Load more" if history is long
+- [x] Shows list of notifications previously sent to this member (reverse chronological)
+- [x] Each entry: subject, date sent, channel (email), status (sent/failed)
+- [x] "Send Notification" button at top opens the compose dialog, pre-populated with this member as sole recipient
+- [x] Reuses `SendNotificationDialog` from bulk actions
+- [x] Empty state: "No notifications sent to this member yet"
+- [x] Pagination or "Load more" if history is long
 
 **Backend Dependency:** Notification log retrieval is deferred — the `POST /api/v1/notifications/send` route from FE-MEMBERS-002a handles sending. A `GET /api/v1/members/:id/notifications` route will be needed but can ship as a fast-follow (the tab renders empty state until then).
 

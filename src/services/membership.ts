@@ -55,6 +55,7 @@ export interface ListMembersResponse {
 export interface ListMembersParams {
   limit?: number;
   offset?: number;
+  include_deactivated?: boolean;
 }
 
 export async function listMembers(params?: ListMembersParams): Promise<ListMembersResponse> {
@@ -65,6 +66,9 @@ export async function listMembers(params?: ListMembersParams): Promise<ListMembe
   if (params?.offset !== undefined) {
     query.set('offset', String(params.offset));
   }
+  if (params?.include_deactivated !== undefined) {
+    query.set('include_deactivated', String(params.include_deactivated));
+  }
 
   const suffix = query.toString();
   return getJSON<ListMembersResponse>(`/members${suffix ? `?${suffix}` : ''}`);
@@ -73,6 +77,8 @@ export async function listMembers(params?: ListMembersParams): Promise<ListMembe
 export interface MemberSummaryResponse {
   members: ListMembersResponse;
   pending_invite_ct: number;
+  active_member_ct: number;
+  deactivated_member_ct: number;
 }
 
 export async function getMemberSummary(params?: ListMembersParams): Promise<MemberSummaryResponse> {
@@ -82,6 +88,9 @@ export async function getMemberSummary(params?: ListMembersParams): Promise<Memb
   }
   if (params?.offset !== undefined) {
     query.set('offset', String(params.offset));
+  }
+  if (params?.include_deactivated !== undefined) {
+    query.set('include_deactivated', String(params.include_deactivated));
   }
 
   const suffix = query.toString();
@@ -272,6 +281,27 @@ export async function removeMember(memberId: string): Promise<void> {
   await delJSON<void>(`/members/${memberId}`);
 }
 
+export interface UpdateMemberStatusRequest {
+  status: 'active' | 'disabled';
+}
+
+export async function updateMemberStatus(
+  memberId: string,
+  status: UpdateMemberStatusRequest['status'],
+): Promise<MemberDetail> {
+  return patchJSON<UpdateMemberStatusRequest, MemberDetail>(`/members/${memberId}/status`, {
+    status,
+  });
+}
+
+export interface ForceReauthResponse {
+  success: boolean;
+}
+
+export async function forceMemberReauth(memberId: string): Promise<ForceReauthResponse> {
+  return postJSON<undefined, ForceReauthResponse>(`/members/${memberId}/force-reauth`);
+}
+
 export interface SendNotificationRequest {
   recipient_ids: string[];
   subject: string;
@@ -290,6 +320,44 @@ export async function sendNotification(
   return postJSON<SendNotificationRequest, SendNotificationResponse>(
     '/notifications/send',
     payload,
+  );
+}
+
+export type NotificationChannel = 'email' | string;
+export type NotificationStatus = 'sent' | 'failed' | 'queued' | string;
+
+export interface MemberNotification {
+  id: string;
+  subject: string;
+  sent_at: string;
+  channel: NotificationChannel;
+  status: NotificationStatus;
+}
+
+export interface MemberNotificationResponse {
+  data: MemberNotification[];
+  next_cursor?: string | null;
+}
+
+export interface MemberNotificationParams {
+  limit?: number;
+  cursor?: string;
+}
+
+export async function getMemberNotifications(
+  memberId: string,
+  params?: MemberNotificationParams,
+): Promise<MemberNotificationResponse> {
+  const query = new URLSearchParams();
+  if (params?.limit !== undefined) {
+    query.set('limit', String(params.limit));
+  }
+  if (params?.cursor) {
+    query.set('cursor', params.cursor);
+  }
+  const suffix = query.toString();
+  return getJSON<MemberNotificationResponse>(
+    `/members/${memberId}/notifications${suffix ? `?${suffix}` : ''}`,
   );
 }
 
