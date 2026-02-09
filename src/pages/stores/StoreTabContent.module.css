@@ -1,0 +1,21 @@
+.panel {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.25);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.description {
+  margin: 0.5rem 0 0;
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+.actions {
+  margin-top: var(--space-3);
+}

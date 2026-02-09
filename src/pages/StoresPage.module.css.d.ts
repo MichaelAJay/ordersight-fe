@@ -1,0 +1,34 @@
+declare const styles: {
+  readonly page: string;
+  readonly pageHeader: string;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly controls: string;
+  readonly searchField: string;
+  readonly searchInput: string;
+  readonly filterGroup: string;
+  readonly filterOption: string;
+  readonly summary: string;
+  readonly summaryText: string;
+  readonly storeList: string;
+  readonly storeCard: string;
+  readonly storeCardHeader: string;
+  readonly storeTitle: string;
+  readonly storeName: string;
+  readonly storeStatus: string;
+  readonly storeMeta: string;
+  readonly storeStats: string;
+  readonly storeStat: string;
+  readonly statLabel: string;
+  readonly statValue: string;
+  readonly loadingState: string;
+  readonly errorState: string;
+  readonly emptyState: string;
+  readonly errorTitle: string;
+  readonly emptyTitle: string;
+  readonly errorText: string;
+  readonly emptyText: string;
+  readonly emptyActions: string;
+};
+
+export default styles;

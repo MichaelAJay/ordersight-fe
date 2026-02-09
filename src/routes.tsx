@@ -49,6 +49,57 @@ export const router = createBrowserRouter([
           return { Component: mod.MembersPage };
         },
       },
+      {
+        path: '/stores',
+        lazy: async () => {
+          const mod = await import('./pages/StoresPage');
+          return { Component: mod.StoresPage };
+        },
+      },
+      {
+        path: '/stores/:storeId',
+        lazy: async () => {
+          const mod = await import('./pages/stores/StoreShell');
+          return { Component: mod.StoreShell };
+        },
+        children: [
+          {
+            index: true,
+            lazy: async () => {
+              const mod = await import('./pages/stores/StoreIndexRedirect');
+              return { Component: mod.StoreIndexRedirect };
+            },
+          },
+          {
+            path: 'orders',
+            lazy: async () => {
+              const mod = await import('./pages/stores/StoreOrdersPage');
+              return { Component: mod.StoreOrdersPage };
+            },
+          },
+          {
+            path: 'team',
+            lazy: async () => {
+              const mod = await import('./pages/stores/StoreTeamPage');
+              return { Component: mod.StoreTeamPage };
+            },
+          },
+          {
+            path: 'activity',
+            lazy: async () => {
+              const mod = await import('./pages/stores/StoreActivityPage');
+              return { Component: mod.StoreActivityPage };
+            },
+          },
+          {
+            path: 'settings',
+            lazy: async () => {
+              const mod = await import('./pages/stores/StoreSettingsPage');
+              return { Component: mod.StoreSettingsPage };
+            },
+          },
+        ],
+      },
     ],
     // add Stores/Menus/Orders etc progressively per spec
   },
