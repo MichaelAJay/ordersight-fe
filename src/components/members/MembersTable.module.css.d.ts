@@ -1,6 +1,7 @@
 declare const styles: {
   readonly table: string;
   readonly rowClickable: string;
+  readonly rowDeactivated: string;
   readonly checkboxCell: string;
   readonly memberCell: string;
   readonly avatar: string;

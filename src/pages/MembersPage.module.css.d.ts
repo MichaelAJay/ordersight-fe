@@ -12,6 +12,10 @@ declare const styles: {
   readonly availability: string;
   readonly availabilityHint: string;
   readonly availabilityValue: string;
+  readonly deactivatedWarning: string;
+  readonly deactivatedWarningTitle: string;
+  readonly deactivatedWarningText: string;
+  readonly deactivatedToggle: string;
   readonly filterCopy: string;
   readonly filterHint: string;
   readonly slider: string;
