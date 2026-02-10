@@ -58,6 +58,11 @@ export interface ListMembersParams {
   include_deactivated?: boolean;
 }
 
+export interface StoreMembersResponse {
+  members: MemberWithUser[];
+  pagination?: Pagination;
+}
+
 export async function listMembers(params?: ListMembersParams): Promise<ListMembersResponse> {
   const query = new URLSearchParams();
   if (params?.limit !== undefined) {
@@ -72,6 +77,20 @@ export async function listMembers(params?: ListMembersParams): Promise<ListMembe
 
   const suffix = query.toString();
   return getJSON<ListMembersResponse>(`/members${suffix ? `?${suffix}` : ''}`);
+}
+
+export async function listStoreMembers(
+  storeId: string,
+): Promise<StoreMembersResponse | MemberWithUser[]> {
+  return getJSON<StoreMembersResponse | MemberWithUser[]>(`/stores/${storeId}/members`);
+}
+
+export async function getStoreMemberDetail(storeId: string, memberId: string): Promise<unknown> {
+  return getJSON<unknown>(`/stores/${storeId}/members/${memberId}`);
+}
+
+export async function listStoreMemberOrders(storeId: string, memberId: string): Promise<unknown> {
+  return getJSON<unknown>(`/stores/${storeId}/members/${memberId}/orders`);
 }
 
 export interface MemberSummaryResponse {

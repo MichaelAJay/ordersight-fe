@@ -1,0 +1,250 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.25);
+}
+
+.searchField {
+  flex: 1;
+  min-width: 220px;
+}
+
+.searchInput {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  color: inherit;
+  font-size: 0.9rem;
+}
+
+.searchInput:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.filterGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.filterOption {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: transparent;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.filterOption[data-selected] {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.filterOption[data-focus-visible] {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.summaryText {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.statePanel {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.25);
+}
+
+.stateTitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.stateText {
+  margin: 0.5rem 0 0;
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+.actionMessage {
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.actionMessage[data-tone='success'] {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.actionMessage[data-tone='error'] {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.actionMessage[data-tone='info'] {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.assignPanel {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.assignHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.assignTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.assignHint {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.assignControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.assignActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.assignError {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #f87171;
+}
+
+.comboBox {
+  flex: 1;
+  min-width: 240px;
+}
+
+.comboRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.comboInput {
+  flex: 1;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  color: inherit;
+  font-size: 0.9rem;
+}
+
+.comboInput:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.comboButton {
+  padding: 0 0.65rem;
+}
+
+.comboPopover {
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
+  padding: var(--space-2);
+}
+
+.comboListBox {
+  display: grid;
+  gap: 0.25rem;
+  outline: none;
+}
+
+.comboItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.comboItem[data-focused] {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.comboItemMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.comboItemName {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.comboItemEmail {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.comboItemRole {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}

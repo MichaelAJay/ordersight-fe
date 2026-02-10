@@ -4,8 +4,13 @@ import axios, {
   AxiosRequestHeaders,
   InternalAxiosRequestConfig,
 } from 'axios';
+import { requireAuthRecovery } from './authRecovery';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
+// Same-origin by default (works for localhost:8081 AND ngrok)
+// If you ever want a separate API host, set VITE_API_ORIGIN to e.g. "https://api.example.com"
+const API_ORIGIN = (import.meta.env?.['VITE_API_ORIGIN'] || '').replace(/\/+$/, '');
+const API_BASE_URL = `${API_ORIGIN}/api/v1`;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,24 +19,31 @@ export const api = axios.create({
   headers: { Accept: 'application/json' },
 });
 
-type AuthTokenGetter = () => Promise<string | null>;
+type AuthTokenGetter = (options?: { skipCache?: boolean }) => Promise<string | null>;
 let authTokenGetter: AuthTokenGetter | null = null;
 export function setAuthTokenGetter(getter: AuthTokenGetter | null) {
   authTokenGetter = getter;
 }
 
-async function attachBearerToken(config: InternalAxiosRequestConfig) {
+type AuthAwareConfig = InternalAxiosRequestConfig & {
+  _authRetry?: boolean;
+  _authHadToken?: boolean;
+};
+
+async function attachBearerToken(config: AuthAwareConfig, options?: { forceRefresh?: boolean }) {
+  if (config.headers?.Authorization) {
+    config._authHadToken = true;
+    return;
+  }
+
   if (!authTokenGetter) {
     return;
   }
 
-  if (config.headers?.Authorization) {
-    return;
-  }
-
-  const token = await authTokenGetter();
+  const token = await authTokenGetter(options?.forceRefresh ? { skipCache: true } : undefined);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    config._authHadToken = true;
   }
 }
 
@@ -39,7 +51,7 @@ api.interceptors.request.use(
   async (config) => {
     config.headers = config.headers ?? ({} as AxiosRequestHeaders);
 
-    await attachBearerToken(config);
+    await attachBearerToken(config as AuthAwareConfig);
 
     // Optional: add a client-side request id to help correlate logs
     return config;
@@ -59,6 +71,27 @@ api.interceptors.response.use(
   (res) => res,
   async (err: AxiosError) => {
     const status = err.response?.status;
+    const config = err.config as AuthAwareConfig | undefined;
+
+    if (status === 401 && authTokenGetter && config && !config._authRetry) {
+      let token: string | null = null;
+      try {
+        token = await authTokenGetter({ skipCache: true });
+      } catch {
+        token = null;
+      }
+      if (token) {
+        config._authRetry = true;
+        config.headers = config.headers ?? ({} as AxiosRequestHeaders);
+        config.headers.Authorization = `Bearer ${token}`;
+        config._authHadToken = true;
+        return api.request(config);
+      }
+    }
+
+    if (status === 401 && config?._authHadToken) {
+      requireAuthRecovery();
+    }
 
     const normalized: HttpError = {
       status,

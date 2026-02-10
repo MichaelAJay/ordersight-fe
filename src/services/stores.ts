@@ -57,8 +57,9 @@ function normalizeOpenOrders(data: unknown): StoreOpenOrdersMap {
   }
 
   const record = data as Record<string, unknown>;
-  if (Array.isArray(record.stores)) {
-    return normalizeOpenOrders(record.stores);
+  const nestedStores = record['stores'];
+  if (Array.isArray(nestedStores)) {
+    return normalizeOpenOrders(nestedStores);
   }
 
   const map: StoreOpenOrdersMap = {};

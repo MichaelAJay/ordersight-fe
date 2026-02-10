@@ -311,7 +311,7 @@ export function BatchInvitePanel({
     if (onAuthRequired) {
       onAuthRequired();
     } else {
-      setFormError('Please sign in to continue.');
+      setFormError('Reconnect your session to continue.');
     }
   };
 

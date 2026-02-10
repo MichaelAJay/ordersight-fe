@@ -1,0 +1,34 @@
+declare const styles: {
+  readonly page: string;
+  readonly controls: string;
+  readonly searchField: string;
+  readonly searchInput: string;
+  readonly filterGroup: string;
+  readonly filterOption: string;
+  readonly summary: string;
+  readonly summaryText: string;
+  readonly statePanel: string;
+  readonly stateTitle: string;
+  readonly stateText: string;
+  readonly actionMessage: string;
+  readonly assignPanel: string;
+  readonly assignHeader: string;
+  readonly assignTitle: string;
+  readonly assignHint: string;
+  readonly assignControls: string;
+  readonly assignActions: string;
+  readonly assignError: string;
+  readonly comboBox: string;
+  readonly comboRow: string;
+  readonly comboInput: string;
+  readonly comboButton: string;
+  readonly comboPopover: string;
+  readonly comboListBox: string;
+  readonly comboItem: string;
+  readonly comboItemMeta: string;
+  readonly comboItemName: string;
+  readonly comboItemEmail: string;
+  readonly comboItemRole: string;
+};
+
+export default styles;

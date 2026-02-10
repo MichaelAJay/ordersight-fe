@@ -4,7 +4,7 @@ import type { AxiosInstance } from 'axios';
 vi.mock('axios', async () => {
   const actual = await vi.importActual<typeof import('axios')>('axios');
 
-  const instance: Pick<AxiosInstance, 'interceptors'> = {
+  const instance: Pick<AxiosInstance, 'interceptors' | 'request'> = {
     interceptors: {
       request: {
         use: vi.fn(),
@@ -25,6 +25,7 @@ vi.mock('axios', async () => {
         },
       },
     },
+    request: vi.fn(),
   };
 
   return {
@@ -36,8 +37,13 @@ vi.mock('axios', async () => {
   };
 });
 
+vi.mock('../authRecovery', () => ({
+  requireAuthRecovery: vi.fn(),
+}));
+
 describe('http interceptors', () => {
   beforeEach(async () => {
+    vi.clearAllMocks();
     vi.resetModules();
     await import('../http'); // ensure interceptors register fresh for each test
   });
@@ -102,5 +108,56 @@ describe('http interceptors', () => {
       message: 'Unauthorized',
       details: { message: 'Unauthorized' },
     });
+  });
+
+  test('retries once with refreshed token on 401', async () => {
+    const { setAuthTokenGetter } = await import('../http');
+    setAuthTokenGetter(async (options) => (options?.skipCache ? 'fresh-token' : 'stale-token'));
+
+    const axios = await import('axios');
+    const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
+    const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
+
+    instance.request.mockResolvedValue({ status: 200, data: { ok: true } });
+
+    const result = await errorInterceptor({
+      response: { status: 401, data: { message: 'Unauthorized' } },
+      config: { url: '/secure', method: 'get', headers: {} },
+      message: 'Unauthorized',
+    });
+
+    expect(instance.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _authRetry: true,
+        headers: expect.objectContaining({ Authorization: 'Bearer fresh-token' }),
+      }),
+    );
+    expect(result).toEqual({ status: 200, data: { ok: true } });
+  });
+
+  test('signals auth recovery when 401 persists with a token', async () => {
+    const { setAuthTokenGetter } = await import('../http');
+    const { requireAuthRecovery } = await import('../authRecovery');
+    setAuthTokenGetter(async () => null);
+
+    const axios = await import('axios');
+    const instance = (axios.default.create as ReturnType<typeof vi.fn>).mock.results[0]?.value;
+    const [, errorInterceptor] = instance.interceptors.response.use.mock.calls[0];
+
+    await expect(
+      errorInterceptor({
+        response: { status: 401, data: { message: 'Unauthorized' } },
+        config: { url: '/secure', method: 'get', headers: {}, _authHadToken: true },
+        message: 'Unauthorized',
+      }),
+    ).rejects.toEqual({
+      status: 401,
+      url: '/secure',
+      method: 'GET',
+      message: 'Unauthorized',
+      details: { message: 'Unauthorized' },
+    });
+
+    expect(requireAuthRecovery).toHaveBeenCalledTimes(1);
   });
 });

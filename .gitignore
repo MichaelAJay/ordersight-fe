@@ -32,3 +32,4 @@ dist-ssr
 # Dev
 dev/
 AGENTS.md
+vite.config.local.ts

@@ -6,6 +6,7 @@ import styles from './MemberProfileBase.module.css';
 
 type MemberProfileBaseProps = {
   member: MemberWithUser | MemberDetail;
+  memberSinceOverride?: string | null;
 };
 
 type DetailRowProps = {
@@ -58,7 +59,7 @@ function getDisplayName(member: MemberWithUser | MemberDetail) {
   return 'Unnamed member';
 }
 
-export function MemberProfileBase({ member }: MemberProfileBaseProps) {
+export function MemberProfileBase({ member, memberSinceOverride }: MemberProfileBaseProps) {
   const user = member.user as MemberUserWithPhone;
   const displayName = getDisplayName(member);
   const email = user.email ?? 'No email on file';
@@ -67,7 +68,11 @@ export function MemberProfileBase({ member }: MemberProfileBaseProps) {
   const lastActiveAt = user.last_active_at ?? null;
   const lastActiveRelative = formatRelativeTime(lastActiveAt);
   const lastActiveExact = formatDateTime(lastActiveAt);
-  const memberSince = formatDate(member.membership.created_at);
+  const memberSinceValue =
+    memberSinceOverride && memberSinceOverride.trim()
+      ? memberSinceOverride
+      : member.membership.created_at;
+  const memberSince = formatDate(memberSinceValue);
 
   const nameValue = (
     <span className={styles.valueInline}>

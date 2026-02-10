@@ -69,7 +69,7 @@ function getSendErrorMessage(error: unknown, fallback: string) {
   const code = details?.code;
 
   if (status === 401) {
-    return 'Please sign in to send notifications.';
+    return 'Reconnect your session to send notifications.';
   }
 
   if (status === 403 && code === 'org_not_bootstrapped') {

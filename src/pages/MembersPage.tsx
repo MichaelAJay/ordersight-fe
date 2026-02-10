@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RedirectToSignIn, useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Slider,
@@ -77,7 +77,6 @@ export function MembersPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [needsAuth, setNeedsAuth] = useState(false);
   const [offset, setOffset] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
   const [inviteBadgeCount, setInviteBadgeCount] = useState<number | null>(null);
@@ -182,7 +181,6 @@ export function MembersPage() {
       setLoading(true);
       setErrorMessage(null);
       setNotFound(false);
-      setNeedsAuth(false);
 
       try {
         const response: MemberSummaryResponse = await getMemberSummary({
@@ -207,7 +205,7 @@ export function MembersPage() {
         const code = details?.code;
 
         if (status === 401) {
-          setNeedsAuth(true);
+          setErrorMessage('We need to reconnect your session to load members.');
           setLoading(false);
           return;
         }
@@ -283,7 +281,6 @@ export function MembersPage() {
 
     const loadInvites = async () => {
       setInviteState((prev) => ({ ...prev, loading: true, error: null }));
-      setNeedsAuth(false);
 
       try {
         const response: InviteSummaryResponse = await getInviteSummary({
@@ -313,8 +310,11 @@ export function MembersPage() {
         const code = details?.code;
 
         if (status === 401) {
-          setNeedsAuth(true);
-          setInviteState((prev) => ({ ...prev, loading: false }));
+          setInviteState((prev) => ({
+            ...prev,
+            loading: false,
+            error: 'We need to reconnect your session to load invites.',
+          }));
           return;
         }
 
@@ -443,11 +443,10 @@ export function MembersPage() {
       const code = details?.code;
 
       if (status === 401) {
-        setNeedsAuth(true);
         updateInviteActionState(invite.id, {
           resending: false,
           uninviting: false,
-          error: 'Please sign in to resend invites.',
+          error: 'Reconnect your session to resend invites.',
         });
         return false;
       }
@@ -564,11 +563,10 @@ export function MembersPage() {
       const code = details?.code;
 
       if (status === 401) {
-        setNeedsAuth(true);
         updateInviteActionState(invite.id, {
           resending: false,
           uninviting: false,
-          error: 'Please sign in to revoke invites.',
+          error: 'Reconnect your session to revoke invites.',
         });
         return false;
       }
@@ -788,8 +786,7 @@ export function MembersPage() {
       const code = details?.code;
 
       if (status === 401) {
-        setNeedsAuth(true);
-        setSendNotificationError('Please sign in to send notifications.');
+        setSendNotificationError('Reconnect your session to send notifications.');
         return;
       }
 
@@ -854,8 +851,10 @@ export function MembersPage() {
       const code = details?.code;
 
       if (status === 401) {
-        setNeedsAuth(true);
-        setMemberActionMessage({ tone: 'error', text: 'Please sign in to export members.' });
+        setMemberActionMessage({
+          tone: 'error',
+          text: 'Reconnect your session to export members.',
+        });
         return;
       }
 
@@ -913,10 +912,6 @@ export function MembersPage() {
     setIsDrawerOpen(false);
     setSelectedMember(null);
   };
-
-  if (needsAuth) {
-    return <RedirectToSignIn redirectUrl={redirectUrl} />;
-  }
 
   return (
     <section className={styles.page}>
@@ -1108,10 +1103,7 @@ export function MembersPage() {
                 Send new invitations and review the latest invite activity.
               </p>
             </div>
-            <BatchInviteTrigger
-              onInvitesComplete={handleInvitesComplete}
-              onAuthRequired={() => setNeedsAuth(true)}
-            />
+            <BatchInviteTrigger onInvitesComplete={handleInvitesComplete} />
           </div>
           {inviteActionMessage ? <p role="status">{inviteActionMessage.text}</p> : null}
           <div className={styles.filterBar}>
