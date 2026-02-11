@@ -177,6 +177,7 @@ export function StoreTeamPage() {
     setOrgMembersLoading(true);
     setOrgMembersError(null);
 
+    // TODO: Replace org member prefetch with server-side member search endpoint.
     listMembers({ limit: ORG_MEMBERS_PAGE_LIMIT, offset: 0 })
       .then((response) => {
         if (!active) return;

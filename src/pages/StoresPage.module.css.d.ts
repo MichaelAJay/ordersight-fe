@@ -4,6 +4,11 @@ declare const styles: {
   readonly title: string;
   readonly subtitle: string;
   readonly controls: string;
+  readonly createField: string;
+  readonly createLabel: string;
+  readonly createInput: string;
+  readonly createHint: string;
+  readonly createError: string;
   readonly searchField: string;
   readonly searchInput: string;
   readonly filterGroup: string;

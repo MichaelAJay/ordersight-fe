@@ -1,4 +1,4 @@
-import { getJSON } from './http';
+import { getJSON, postJSON } from './http';
 
 export type StoreStatus = 'active' | 'paused' | 'archived' | string;
 
@@ -19,6 +19,14 @@ export async function listStores(): Promise<Store[]> {
 
 export async function getStore(storeId: string): Promise<Store> {
   return getJSON<Store>(`/stores/${storeId}`);
+}
+
+export interface CreateStoreRequest {
+  name: string;
+}
+
+export async function createStore(payload: CreateStoreRequest): Promise<Store> {
+  return postJSON<CreateStoreRequest, Store>('/stores', payload);
 }
 
 export type StoreOpenOrdersMap = Record<string, number>;

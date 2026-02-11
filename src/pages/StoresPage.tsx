@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Input, Radio, RadioGroup, TextField } from 'react-aria-components';
+import {
+  Dialog,
+  Heading,
+  Input,
+  Modal,
+  ModalOverlay,
+  Radio,
+  RadioGroup,
+  TextField,
+} from 'react-aria-components';
 import { HttpError } from '../services/http';
 import {
   getMemberDetail,
@@ -10,12 +19,14 @@ import {
   type MemberWithUser,
 } from '../services/membership';
 import {
+  createStore,
   listStores,
   listStoreOpenOrders,
   type Store,
   type StoreOpenOrdersMap,
 } from '../services/stores';
 import { Button } from '@/components/common/Button/Button';
+import modalStyles from '@/components/common/Modal/Modal.module.css';
 import styles from './StoresPage.module.css';
 
 type StatusFilter = 'active' | 'archived' | 'all';
@@ -108,6 +119,10 @@ export function StoresPage() {
 
   const [searchValue, setSearchValue] = useState('');
   const didAutoEnter = useRef(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createLoading, setCreateLoading] = useState(false);
 
   const normalizedClerkRole = normalizeRole(orgRole ?? null);
   const effectiveRole = viewer.role ?? normalizedClerkRole;
@@ -302,6 +317,48 @@ export function StoresPage() {
     setRefreshToken((prev) => prev + 1);
   };
 
+  const handleOpenCreate = () => {
+    setCreateError(null);
+    setCreateOpen(true);
+  };
+
+  const handleCloseCreate = () => {
+    if (createLoading) return;
+    setCreateOpen(false);
+    setCreateName('');
+    setCreateError(null);
+  };
+
+  const handleCreateStore = async () => {
+    const trimmed = createName.trim();
+    if (!trimmed) {
+      setCreateError('Store name is required.');
+      return;
+    }
+
+    setCreateLoading(true);
+    setCreateError(null);
+
+    try {
+      const store = await createStore({ name: trimmed });
+      setCreateOpen(false);
+      setCreateName('');
+      navigate(`/stores/${store.id}/orders`);
+    } catch (error) {
+      const httpError = error as HttpError | Error | null;
+      const status = (httpError as HttpError | null)?.status;
+      if (status === 401) {
+        setCreateError('Reconnect your session to create stores.');
+      } else if (status === 403) {
+        setCreateError('You are not allowed to create stores.');
+      } else {
+        setCreateError(getErrorMessage(error, 'Unable to create store.'));
+      }
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   const renderOpenOrders = (storeId: string) => {
     if (openOrdersStatus !== 'loaded') return '--';
     const value = openOrders[storeId];
@@ -315,6 +372,11 @@ export function StoresPage() {
           <h1 className={styles.title}>Stores</h1>
           <p className={styles.subtitle}>Choose where you want to operate today.</p>
         </div>
+        {isAdmin ? (
+          <Button variant="primary" size="sm" onPress={handleOpenCreate}>
+            Create store
+          </Button>
+        ) : null}
       </header>
 
       <div className={styles.controls}>
@@ -384,8 +446,8 @@ export function StoresPage() {
                 Create your first store to start managing orders and teams.
               </p>
               <div className={styles.emptyActions}>
-                <Button variant="primary" isDisabled>
-                  Create store (coming soon)
+                <Button variant="primary" onPress={handleOpenCreate}>
+                  Create store
                 </Button>
               </div>
             </>
@@ -439,6 +501,90 @@ export function StoresPage() {
           })}
         </div>
       ) : null}
+
+      <ModalOverlay
+        isOpen={createOpen}
+        className={modalStyles.overlay}
+        isDismissable={!createLoading}
+        onOpenChange={(open) => {
+          if (!open) handleCloseCreate();
+        }}
+      >
+        <Modal className={modalStyles.dialog}>
+          <Dialog>
+            <>
+              <div className={modalStyles.header}>
+                <div>
+                  <Heading slot="title" className={modalStyles.title}>
+                    Create store
+                  </Heading>
+                  <p slot="description" className={modalStyles.description}>
+                    Add a new store to this organization.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  className={modalStyles.closeButton}
+                  onPress={handleCloseCreate}
+                  aria-label="Close dialog"
+                >
+                  ×
+                </Button>
+              </div>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleCreateStore();
+                }}
+              >
+                <div className={modalStyles.body}>
+                  <TextField
+                    aria-label="Store name"
+                    value={createName}
+                    onChange={(value) => {
+                      setCreateName(value);
+                      setCreateError(null);
+                    }}
+                    className={styles.createField}
+                  >
+                    <span className={styles.createLabel} slot="label">
+                      Store name
+                    </span>
+                    <Input
+                      className={styles.createInput}
+                      placeholder="e.g. Market Street"
+                      autoFocus
+                    />
+                  </TextField>
+                  <p className={styles.createHint}>This name will be visible to your team.</p>
+                  {createError ? (
+                    <p role="alert" className={styles.createError}>
+                      {createError}
+                    </p>
+                  ) : null}
+                </div>
+                <div className={modalStyles.footer}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onPress={handleCloseCreate}
+                    isDisabled={createLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    isDisabled={createLoading || !createName.trim()}
+                  >
+                    {createLoading ? 'Creating...' : 'Create store'}
+                  </Button>
+                </div>
+              </form>
+            </>
+          </Dialog>
+        </Modal>
+      </ModalOverlay>
     </div>
   );
 }

@@ -34,6 +34,44 @@
   background: rgba(15, 23, 42, 0.25);
 }
 
+.createField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.createLabel {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.createInput {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  color: inherit;
+  font-size: 0.95rem;
+}
+
+.createInput:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.createHint {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.createError {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85rem;
+  color: #f87171;
+}
+
 .searchField {
   flex: 1;
   min-width: 220px;
