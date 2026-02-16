@@ -1,21 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import { HttpError } from '@/services/http';
-import { listMenus, type Menu } from '@/services/menus';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/common/Button/Button';
-import { CreateMenuModal } from '@/components/menus/CreateMenuModal';
-import { ImportMenusCsvModal } from '@/components/menus/ImportMenusCsvModal';
+import { HttpError } from '@/services/http';
+import { listCategories, listMenuItems, type MenuItem, type PriceUnit } from '@/services/menuItems';
 import styles from './MenusPage.module.css';
 
-function normalizeRole(role: string | null | undefined) {
-  if (!role) return null;
-  return role.replace(/^org:/, '');
-}
-
-function isAdminRole(role: string | null | undefined) {
-  if (!role) return false;
-  return role === 'admin' || role === 'super_admin';
-}
+const CATALOG_LIMIT = 100;
 
 function getErrorMessage(error: unknown, fallback: string) {
   const normalized = error as HttpError | Error | null;
@@ -24,147 +15,243 @@ function getErrorMessage(error: unknown, fallback: string) {
   return detailsMessage ?? httpError?.message ?? fallback;
 }
 
-export function MenusPage() {
-  const { isLoaded, orgRole } = useAuth();
-  const [menus, setMenus] = useState<Menu[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [lastSettledRequestKey, setLastSettledRequestKey] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState(0);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+function formatPrice(cents: number | null, unit: PriceUnit | null): string {
+  if (typeof cents !== 'number') {
+    return 'Set later';
+  }
 
-  const normalizedRole = normalizeRole(orgRole ?? null);
-  const isAdmin = isAdminRole(normalizedRole);
-  const requestKey = isLoaded && isAdmin ? String(refreshToken) : null;
-  const loading = requestKey !== null && lastSettledRequestKey !== requestKey;
+  const amount = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+
+  if (unit === 'per_person') {
+    return `${amount} / person`;
+  }
+  if (unit === 'per_unit') {
+    return `${amount} / unit`;
+  }
+  return amount;
+}
+
+function getCategoryMap(items: MenuItem[], categories: { id: string; name: string }[]) {
+  const categoryMap = new Map<string, string>();
+  for (const category of categories) {
+    categoryMap.set(category.id, category.name);
+  }
+
+  const byItem = new Map<string, string>();
+  for (const item of items) {
+    if (!item.category_id) {
+      continue;
+    }
+    const categoryName = categoryMap.get(item.category_id);
+    if (categoryName) {
+      byItem.set(item.id, categoryName);
+    }
+  }
+
+  return byItem;
+}
+
+export function MenusPage() {
+  const navigate = useNavigate();
+  const { isLoaded } = useAuth();
+  const [refreshSeed, setRefreshSeed] = useState(0);
+  const [hasSettledFetch, setHasSettledFetch] = useState(false);
+  const [items, setItems] = useState<MenuItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [categoryMap, setCategoryMap] = useState<Map<string, string>>(new Map());
+  const [error, setError] = useState<string | null>(null);
+
+  const loading = isLoaded && !hasSettledFetch;
 
   useEffect(() => {
-    if (!requestKey) {
+    if (!isLoaded) {
       return;
     }
 
     let active = true;
 
-    listMenus()
-      .then((response) => {
+    Promise.allSettled([listMenuItems({ limit: CATALOG_LIMIT, offset: 0 }), listCategories()])
+      .then((results) => {
         if (!active) return;
-        setMenus(response ?? []);
+
+        const catalogResult = results[0];
+        if (catalogResult.status !== 'fulfilled') {
+          throw catalogResult.reason;
+        }
+
+        const categories = results[1].status === 'fulfilled' ? results[1].value : [];
+
+        setItems(catalogResult.value.items);
+        setTotal(catalogResult.value.total);
+        setCategoryMap(getCategoryMap(catalogResult.value.items, categories));
         setError(null);
       })
       .catch((fetchError) => {
         if (!active) return;
         const httpError = fetchError as HttpError | null;
         if (httpError?.status === 401) {
-          setError('Reconnect your session to load menus.');
+          setError('Reconnect your session to load your menu.');
           return;
         }
         if (httpError?.status === 403) {
-          setError('You do not have permission to view menus.');
+          setError('You do not have permission to view this menu.');
           return;
         }
-        setError(getErrorMessage(fetchError, 'Unable to load menus.'));
+        setError(getErrorMessage(fetchError, 'Unable to load your menu.'));
       })
       .finally(() => {
-        if (active) setLastSettledRequestKey(requestKey);
+        if (active) {
+          setHasSettledFetch(true);
+        }
       });
 
     return () => {
       active = false;
     };
-  }, [requestKey]);
+  }, [isLoaded, refreshSeed]);
 
-  const summaryText = useMemo(() => {
-    const total = menus.length;
-    if (total === 0) return null;
-    return `${total} menu${total === 1 ? '' : 's'}`;
-  }, [menus.length]);
+  const hasItems = total > 0;
+
+  const subtitle = useMemo(() => {
+    if (hasItems) {
+      return 'Everything you have already added. Keep importing or quick-adding anytime.';
+    }
+    return 'Choose the fastest way to bring your menu into Ordersight.';
+  }, [hasItems]);
+
+  const handleRetry = () => {
+    setHasSettledFetch(false);
+    setRefreshSeed((seed) => seed + 1);
+  };
 
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <div>
-          <h1 className={styles.title}>Menus</h1>
-          <p className={styles.subtitle}>Admin menu library for your organization.</p>
+          <h1 className={styles.title}>Your menu</h1>
+          <p className={styles.subtitle}>{subtitle}</p>
         </div>
-        {isLoaded && isAdmin ? (
-          <div className={styles.headerActions}>
-            <Button variant="outline" size="sm" onPress={() => setImportOpen(true)}>
-              Import CSV
+        {isLoaded && !loading && !error && hasItems ? (
+          <div className={styles.toolbar}>
+            <Button type="button" size="sm" onPress={() => navigate('/menus/import')}>
+              Import from spreadsheet
             </Button>
-            <Button variant="primary" size="sm" onPress={() => setCreateOpen(true)}>
-              Create Menu
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onPress={() => navigate('/menus/quick-entry')}
+            >
+              Quick-add items
             </Button>
           </div>
         ) : null}
       </header>
 
       {!isLoaded ? (
-        <div className={styles.loadingState}>
+        <section className={styles.loadingState}>
           <p>Checking access...</p>
-        </div>
+        </section>
       ) : null}
 
-      {isLoaded && !isAdmin ? (
-        <div className={styles.emptyState}>
-          <h2 className={styles.emptyTitle}>Menu management is admin only</h2>
-          <p className={styles.emptyText}>
-            Store-level menus will be available from the Store page for non-admin users.
-          </p>
-        </div>
+      {isLoaded && loading ? (
+        <section className={styles.loadingState}>
+          <p>Loading your menu...</p>
+        </section>
       ) : null}
 
-      {isLoaded && isAdmin && loading ? (
-        <div className={styles.loadingState}>
-          <p>Loading menus...</p>
-        </div>
-      ) : null}
-
-      {isLoaded && isAdmin && !loading && error ? (
-        <div className={styles.errorState} role="alert">
-          <h2 className={styles.errorTitle}>Unable to load menus</h2>
+      {isLoaded && !loading && error ? (
+        <section className={styles.errorState} role="alert">
+          <h2 className={styles.errorTitle}>Unable to load your menu</h2>
           <p className={styles.errorText}>{error}</p>
-          <Button variant="outline" size="sm" onPress={() => setRefreshToken((prev) => prev + 1)}>
-            Retry
-          </Button>
-        </div>
-      ) : null}
-
-      {isLoaded && isAdmin && !loading && !error && summaryText ? (
-        <div className={styles.summary}>
-          <span className={styles.summaryText}>{summaryText}</span>
-        </div>
-      ) : null}
-
-      {isLoaded && isAdmin && !loading && !error && menus.length === 0 ? (
-        <div className={styles.emptyState}>
-          <h2 className={styles.emptyTitle}>No menus yet</h2>
-          <p className={styles.emptyText}>
-            Create your first menu or import a CSV file to get started.
-          </p>
-          <div className={styles.emptyActions}>
-            <Button variant="outline" onPress={() => setImportOpen(true)}>
-              Import CSV
-            </Button>
-            <Button variant="primary" onPress={() => setCreateOpen(true)}>
-              Create Menu
+          <div className={styles.errorActions}>
+            <Button type="button" variant="outline" size="sm" onPress={handleRetry}>
+              Retry
             </Button>
           </div>
-        </div>
+        </section>
       ) : null}
 
-      {isLoaded && isAdmin && !loading && !error && menus.length > 0 ? (
-        <div className={styles.menuGrid} aria-label="Menu list">
-          {menus.map((menu) => (
-            <article key={menu.id} className={styles.menuCard}>
-              <h2 className={styles.menuName}>{menu.name}</h2>
-              <p className={styles.menuMeta}>Menu ID: {menu.id}</p>
+      {isLoaded && !loading && !error && !hasItems ? (
+        <section className={styles.emptyState}>
+          <h2 className={styles.emptyTitle}>Let&apos;s get your menu set up</h2>
+          <p className={styles.emptyText}>
+            You can start with a spreadsheet or type things in manually. Either way, we&apos;ll help
+            you move quickly.
+          </p>
+
+          <div className={styles.pathGrid}>
+            <article className={styles.pathCard}>
+              <h3 className={styles.pathTitle}>Import from a spreadsheet</h3>
+              <p className={styles.pathText}>
+                Upload a CSV or Excel export of your menu and we&apos;ll walk you through getting it
+                into the system.
+              </p>
+              <Button type="button" onPress={() => navigate('/menus/import')}>
+                Start import
+              </Button>
             </article>
-          ))}
-        </div>
+
+            <article className={styles.pathCard}>
+              <h3 className={styles.pathTitle}>Enter items manually</h3>
+              <p className={styles.pathText}>
+                Add your items one at a time or use our quick-entry table.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onPress={() => navigate('/menus/quick-entry')}
+              >
+                Open quick entry
+              </Button>
+            </article>
+          </div>
+        </section>
       ) : null}
 
-      <CreateMenuModal isOpen={createOpen} onOpenChange={setCreateOpen} />
-      <ImportMenusCsvModal isOpen={importOpen} onOpenChange={setImportOpen} />
+      {isLoaded && !loading && !error && hasItems ? (
+        <section className={styles.catalogPanel}>
+          <p className={styles.summary}>
+            {total === 1 ? '1 item in your menu' : `${total} items in your menu`}
+          </p>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Price</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <p className={styles.itemName}>{item.name}</p>
+                      {item.description ? (
+                        <p className={styles.itemDescription}>{item.description}</p>
+                      ) : null}
+                    </td>
+                    <td>{categoryMap.get(item.id) ?? 'Uncategorized'}</td>
+                    <td>{formatPrice(item.base_price, item.price_unit)}</td>
+                    <td>
+                      <span className={styles.statusBadge} data-active={item.is_active}>
+                        {item.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -1,0 +1,344 @@
+.wizardDialog {
+  width: min(1020px, 100%);
+  height: min(88vh, 920px);
+  max-height: min(88vh, 920px);
+  overflow: hidden;
+}
+
+.wizardContent {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wizardBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.stepRail {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.stepItem {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 0.65rem;
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.stepButton {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: left;
+  padding: 0.55rem 0.6rem;
+  cursor: pointer;
+}
+
+.stepActive {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(37, 99, 235, 0.16);
+}
+
+.stepDone {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.stepNumber {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.stepLabel {
+  display: block;
+  font-size: 0.79rem;
+  font-weight: 600;
+}
+
+.stepHelper {
+  display: block;
+  opacity: 0.72;
+  font-size: 0.7rem;
+}
+
+.panel {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 0.7rem;
+  padding: 0.9rem;
+  background: rgba(15, 23, 42, 0.2);
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.panelHint {
+  margin: 0.3rem 0 0.8rem;
+  opacity: 0.75;
+  font-size: 0.85rem;
+}
+
+.panelHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.7rem;
+}
+
+.fieldGroup {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.fieldLabel {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.fieldRow {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.input,
+.textarea,
+.select,
+.numberInput {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 0.55rem;
+  background: rgba(2, 6, 23, 0.45);
+  color: inherit;
+  font-size: 0.83rem;
+  line-height: 1.3;
+  padding: 0.45rem 0.55rem;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.numberInput {
+  max-width: 10rem;
+}
+
+.chipWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.7rem 0 0.95rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  font-size: 0.75rem;
+}
+
+.cardGrid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.card,
+.familyCard,
+.variantCard,
+.attachmentCard,
+.summaryCard {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 0.65rem;
+  background: rgba(2, 6, 23, 0.28);
+  padding: 0.7rem;
+}
+
+.familyStack,
+.variantStack,
+.optionList,
+.attachmentSection {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.variantTitle,
+.attachmentTitle {
+  margin: 0;
+  font-size: 0.83rem;
+}
+
+.optionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, 110px) auto auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.pricePreview {
+  font-size: 0.74rem;
+  opacity: 0.78;
+}
+
+.checkboxLine {
+  margin-top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+}
+
+.inlineActions {
+  margin-top: 0.55rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.checkboxGrid {
+  margin-top: 0.65rem;
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.checkboxTile {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  font-size: 0.77rem;
+  padding: 0.4rem;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 0.45rem;
+}
+
+.checkboxTile small {
+  display: block;
+  opacity: 0.7;
+  font-size: 0.69rem;
+  margin-top: 0.12rem;
+}
+
+.emptyText {
+  margin: 0;
+  font-size: 0.78rem;
+  opacity: 0.74;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 0.7rem;
+}
+
+.summaryCard h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.84rem;
+}
+
+.summaryCard ul {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.payloadPreview {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0.7rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(2, 6, 23, 0.55);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.errorBox {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.errorTitle {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.79rem;
+}
+
+.errorBox ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.77rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 940px) {
+  .wizardDialog {
+    width: min(760px, 100%);
+  }
+
+  .fieldRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .optionRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stepRail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .stepRail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

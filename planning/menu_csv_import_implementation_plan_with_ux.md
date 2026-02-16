@@ -14,6 +14,7 @@
 >
 > - RTM: MNU-1, MNU-2, STO-1, ORD-1 (org-owned menus linked to stores, store-scoped orders)
 > - Roadmap Phase 1: Store/Menu management + CSV import/export
+> - DDL: /Users/michaeljay/go-dev/ordersight/migrations/0001_init_up.sql
 
 ---
 
@@ -24,6 +25,10 @@
 ### Goal
 
 Create a versioned Import Field contract that abstracts DB column names.
+
+### Status
+
+Completed on 2026-02-11.
 
 ### Implementation
 
@@ -69,6 +74,17 @@ Expose as:
 - FE and BE share stable contract.
 - Required fields enforced at API layer.
 - Versioned for future-proofing.
+
+### Completion Notes (2026-02-11)
+
+- Backend source-of-truth registry added at `ordersight/internal/domain/menuimport/contract.go` with:
+  - version `1`
+  - modes `ITEM_CATALOG` and `MENU_LAYOUT`
+  - deterministic `required_fields` + `optional_fields`
+  - required-field mapping validation helpers for API-layer enforcement.
+- Backend endpoint added: `GET /api/v1/imports/menus/fields?mode=ITEM_CATALOG|MENU_LAYOUT`.
+- Frontend now consumes backend contract via `ordersight-fe/src/services/menuImport.ts`.
+- CSV import modal now loads and displays both mode contracts from backend (`ordersight-fe/src/components/menus/ImportMenusCsvModal.tsx`) so FE uses the same contract object BE serves.
 
 ---
 

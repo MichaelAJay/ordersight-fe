@@ -10,3 +10,98 @@
   font-size: 0.82rem;
   opacity: 0.7;
 }
+
+.error {
+  margin: 0.7rem 0 0;
+  color: #b91c1c;
+  font-size: 0.84rem;
+}
+
+.contractGrid {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.contractCard {
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 0.5rem;
+  padding: 0.7rem;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.contractTitle {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+}
+
+.contractVersion {
+  margin: 0.25rem 0 0.55rem;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.contractLabel {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.fieldList {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.fileInput {
+  margin-top: 0.35rem;
+  width: 100%;
+  font-size: 0.78rem;
+}
+
+.inlineActions {
+  margin-top: 0.6rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.mappingRow {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.mappingMeta {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.selectControl,
+.inputControl {
+  width: 100%;
+  border: 1px solid rgba(100, 116, 139, 0.45);
+  border-radius: 0.45rem;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  padding: 0.42rem 0.5rem;
+}
+
+.warning {
+  margin: 0.55rem 0 0;
+  color: #b45309;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.success {
+  margin: 0.55rem 0 0;
+  color: #166534;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}

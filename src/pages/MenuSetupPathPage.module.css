@@ -1,0 +1,31 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.panel {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.28);
+  padding: var(--space-4);
+  max-width: 760px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.lead {
+  margin: 0.6rem 0 0;
+  opacity: 0.76;
+}
+
+.actions {
+  margin-top: var(--space-4);
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

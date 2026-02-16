@@ -64,6 +64,20 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: '/menus/import',
+        lazy: async () => {
+          const mod = await import('./pages/MenuImportWizardPage');
+          return { Component: mod.MenuImportWizardPage };
+        },
+      },
+      {
+        path: '/menus/quick-entry',
+        lazy: async () => {
+          const mod = await import('./pages/MenuQuickEntryPage');
+          return { Component: mod.MenuQuickEntryPage };
+        },
+      },
+      {
         path: '/stores/:storeId',
         lazy: async () => {
           const mod = await import('./pages/stores/StoreShell');
