@@ -43,6 +43,10 @@ describe('menuImport service', () => {
       row_errors: [{ row: 2, errors: ['price is invalid'] }],
       validated_preview: [{ row: 1, name: 'Turkey Club', price: 1200, price_unit: 'flat' }],
       modifier_groups: [{ group_name: 'Add-ons', exists: false }],
+      mapped_columns: [
+        { field: 'required.name', column: 'Item Name', sample_values: ['Turkey Club'] },
+      ],
+      remaining_columns: [{ column: 'Add-ons', sample_values: ['Extra Mayo'] }],
     });
 
     const { mapMenuImportCSV } = await import('../menuImport');
@@ -65,6 +69,15 @@ describe('menuImport service', () => {
     expect(result.row_errors).toHaveLength(1);
     expect(result.validated_preview).toHaveLength(1);
     expect(result.modifier_groups[0]).toEqual({ group_name: 'Add-ons', exists: false });
+    expect(result.mapped_columns[0]).toEqual({
+      field: 'required.name',
+      column: 'Item Name',
+      sample_values: ['Turkey Club'],
+    });
+    expect(result.remaining_columns[0]).toEqual({
+      column: 'Add-ons',
+      sample_values: ['Extra Mayo'],
+    });
   });
 
   test('commits CSV import with /imports/csv/:session/commit', async () => {

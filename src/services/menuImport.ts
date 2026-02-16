@@ -54,10 +54,23 @@ export interface MenuImportModifierGroupResolution {
   exists: boolean;
 }
 
+export interface MenuImportMappedColumnPreview {
+  field: string;
+  column: string;
+  sample_values: string[];
+}
+
+export interface MenuImportRemainingColumnPreview {
+  column: string;
+  sample_values: string[];
+}
+
 export interface MenuImportMappingValidationResult {
   row_errors: MenuImportRowValidationError[];
   validated_preview: MenuImportValidatedPreviewRow[];
   modifier_groups: MenuImportModifierGroupResolution[];
+  mapped_columns: MenuImportMappedColumnPreview[];
+  remaining_columns: MenuImportRemainingColumnPreview[];
 }
 
 export interface MenuImportCommitError {
@@ -150,10 +163,37 @@ function normalizeMappingValidationResult(payload: unknown): MenuImportMappingVa
         })
     : [];
 
+  const mappedColumns = Array.isArray(record['mapped_columns'])
+    ? record['mapped_columns']
+        .filter((entry) => entry && typeof entry === 'object')
+        .map((entry) => {
+          const mapped = entry as Record<string, unknown>;
+          return {
+            field: normalizeString(mapped['field']),
+            column: normalizeString(mapped['column']),
+            sample_values: normalizeStringList(mapped['sample_values']),
+          };
+        })
+    : [];
+
+  const remainingColumns = Array.isArray(record['remaining_columns'])
+    ? record['remaining_columns']
+        .filter((entry) => entry && typeof entry === 'object')
+        .map((entry) => {
+          const remaining = entry as Record<string, unknown>;
+          return {
+            column: normalizeString(remaining['column']),
+            sample_values: normalizeStringList(remaining['sample_values']),
+          };
+        })
+    : [];
+
   return {
     row_errors: rowErrors,
     validated_preview: preview,
     modifier_groups: modifierGroups,
+    mapped_columns: mappedColumns,
+    remaining_columns: remainingColumns,
   };
 }
 
