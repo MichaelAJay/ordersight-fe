@@ -62,26 +62,26 @@ function normalizeMenuItem(value: unknown): MenuItem | null {
   }
 
   const record = value as Record<string, unknown>;
-  const id = normalizeString(record.id);
-  const name = normalizeString(record.name);
+  const id = normalizeString(record['id']);
+  const name = normalizeString(record['name']);
 
   if (!id || !name) {
     return null;
   }
 
   const basePrice =
-    typeof record.base_price === 'number' && Number.isInteger(record.base_price)
-      ? record.base_price
+    typeof record['base_price'] === 'number' && Number.isInteger(record['base_price'])
+      ? record['base_price']
       : null;
 
   return {
     id,
     name,
-    category_id: normalizeOptionalString(record.category_id),
-    description: normalizeOptionalString(record.description),
+    category_id: normalizeOptionalString(record['category_id']),
+    description: normalizeOptionalString(record['description']),
     base_price: basePrice,
-    price_unit: normalizeOptionalString(record.price_unit),
-    is_active: record.is_active !== false,
+    price_unit: normalizeOptionalString(record['price_unit']),
+    is_active: record['is_active'] !== false,
   };
 }
 
@@ -91,7 +91,7 @@ function normalizeMenuItemList(payload: unknown, fallbackLimit: number): ListMen
   }
 
   const record = payload as Record<string, unknown>;
-  const rawItems = Array.isArray(record.items) ? record.items : [];
+  const rawItems = Array.isArray(record['items']) ? record['items'] : [];
   const items: MenuItem[] = [];
 
   for (const entry of rawItems) {
@@ -103,9 +103,9 @@ function normalizeMenuItemList(payload: unknown, fallbackLimit: number): ListMen
 
   return {
     items,
-    total: normalizeNonNegativeInt(record.total, items.length),
-    limit: normalizeNonNegativeInt(record.limit, fallbackLimit),
-    offset: normalizeNonNegativeInt(record.offset, 0),
+    total: normalizeNonNegativeInt(record['total'], items.length),
+    limit: normalizeNonNegativeInt(record['limit'], fallbackLimit),
+    offset: normalizeNonNegativeInt(record['offset'], 0),
   };
 }
 
@@ -138,8 +138,8 @@ function normalizeCategory(value: unknown): Category | null {
   }
 
   const record = value as Record<string, unknown>;
-  const id = normalizeString(record.id);
-  const name = normalizeString(record.name);
+  const id = normalizeString(record['id']);
+  const name = normalizeString(record['name']);
   if (!id || !name) {
     return null;
   }
@@ -147,7 +147,7 @@ function normalizeCategory(value: unknown): Category | null {
   return {
     id,
     name,
-    sort_order: normalizeNonNegativeInt(record.sort_order, 0),
+    sort_order: normalizeNonNegativeInt(record['sort_order'], 0),
   };
 }
 

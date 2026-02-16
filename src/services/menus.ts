@@ -47,23 +47,23 @@ function normalizeMenuSummary(value: unknown): MenuSummary | null {
     return null;
   }
   const record = value as Record<string, unknown>;
-  const id = normalizeString(record.id);
-  const name = normalizeString(record.name);
+  const id = normalizeString(record['id']);
+  const name = normalizeString(record['name']);
   if (!id || !name) {
     return null;
   }
   return {
     id,
-    org_id: normalizeOptionalString(record.org_id) ?? undefined,
+    org_id: normalizeOptionalString(record['org_id']) ?? undefined,
     name,
-    description: normalizeOptionalString(record.description),
-    is_active: typeof record.is_active === 'boolean' ? record.is_active : undefined,
+    description: normalizeOptionalString(record['description']),
+    is_active: typeof record['is_active'] === 'boolean' ? record['is_active'] : undefined,
     item_count:
-      typeof record.item_count === 'number' && Number.isInteger(record.item_count)
-        ? record.item_count
+      typeof record['item_count'] === 'number' && Number.isInteger(record['item_count'])
+        ? record['item_count']
         : undefined,
-    created_at: normalizeOptionalString(record.created_at) ?? undefined,
-    updated_at: normalizeOptionalString(record.updated_at) ?? undefined,
+    created_at: normalizeOptionalString(record['created_at']) ?? undefined,
+    updated_at: normalizeOptionalString(record['updated_at']) ?? undefined,
   };
 }
 
@@ -72,26 +72,27 @@ function normalizeMenuDetail(value: unknown): MenuDetail | null {
     return null;
   }
   const record = value as Record<string, unknown>;
-  const id = normalizeString(record.id);
-  const name = normalizeString(record.name);
+  const id = normalizeString(record['id']);
+  const name = normalizeString(record['name']);
   if (!id || !name) {
     return null;
   }
 
-  const items = Array.isArray(record.items)
-    ? record.items
+  const items = Array.isArray(record['items'])
+    ? record['items']
         .filter((entry) => entry && typeof entry === 'object')
         .map((entry) => {
           const itemRecord = entry as Record<string, unknown>;
           return {
             menu_item:
-              itemRecord.menu_item && typeof itemRecord.menu_item === 'object'
-                ? (itemRecord.menu_item as Record<string, unknown>)
+              itemRecord['menu_item'] && typeof itemRecord['menu_item'] === 'object'
+                ? (itemRecord['menu_item'] as Record<string, unknown>)
                 : {},
-            is_active: itemRecord.is_active !== false,
+            is_active: itemRecord['is_active'] !== false,
             sort_order:
-              typeof itemRecord.sort_order === 'number' && Number.isInteger(itemRecord.sort_order)
-                ? itemRecord.sort_order
+              typeof itemRecord['sort_order'] === 'number' &&
+              Number.isInteger(itemRecord['sort_order'])
+                ? itemRecord['sort_order']
                 : 0,
           };
         })
@@ -99,13 +100,13 @@ function normalizeMenuDetail(value: unknown): MenuDetail | null {
 
   return {
     id,
-    org_id: normalizeOptionalString(record.org_id) ?? undefined,
+    org_id: normalizeOptionalString(record['org_id']) ?? undefined,
     name,
-    description: normalizeOptionalString(record.description),
-    is_active: typeof record.is_active === 'boolean' ? record.is_active : undefined,
+    description: normalizeOptionalString(record['description']),
+    is_active: typeof record['is_active'] === 'boolean' ? record['is_active'] : undefined,
     items,
-    created_at: normalizeOptionalString(record.created_at) ?? undefined,
-    updated_at: normalizeOptionalString(record.updated_at) ?? undefined,
+    created_at: normalizeOptionalString(record['created_at']) ?? undefined,
+    updated_at: normalizeOptionalString(record['updated_at']) ?? undefined,
   };
 }
 
