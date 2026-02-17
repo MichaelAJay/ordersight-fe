@@ -1,745 +1,516 @@
-# Menu & CSV Import Implementation Plan (JIRA-Style Stories)
+# Menu CSV Import Implementation Plan + UX (Reconciled)
 
-> This document defines the sequenced implementation plan for CSV-based Menu + Item onboarding.
->
-> Engineering Directive:
-> Implement from **first principles**, not cargo cult programming.
->
-> - Understand invariants before writing code.
-> - Respect database constraints as system truth.
-> - Make failure states explicit and observable.
-> - Prefer clarity over cleverness.
->
-> This plan aligns with:
->
-> - RTM: MNU-1, MNU-2, STO-1, ORD-1 (org-owned menus linked to stores, store-scoped orders)
-> - Roadmap Phase 1: Store/Menu management + CSV import/export
-> - DDL: /Users/michaeljay/go-dev/ordersight/migrations/0001_init_up.sql
+**Last Updated:** 2026-02-17  
+**Status:** Reconciled to latest planning + DDL
+**Canonical Planning Doc:** `menu_csv_import_implementation_plan_with_ux.md` remains the single source of truth for CSV import wizard behavior.
+
+## Reconciliation Inputs
+
+- `ordersight/planning/menu_stories_update.md`
+- `ordersight-fe/planning/menu_stories_update_2.md`
+- `ordersight/planning/menu_system_ddl.sql`
+- `ordersight/migrations/0001_init_up.sql`
+
+`menu_stories_update_2.md` takes precedence wherever the two update docs overlap.
 
 ---
 
-# EPIC E1 — Import Field Contract (FE/BE Handshake)
+## 1. Scope and Reconciliation Notes
 
-## Story 1 — Define Import Field Registry
+This document supersedes the older FE import plan that used:
 
-### Goal
+- import mode selection (`ITEM_CATALOG` vs `MENU_LAYOUT`)
+- legacy `/imports/menus/*` endpoints
+- a 7-step flow with store assignment in-wizard
 
-Create a versioned Import Field contract that abstracts DB column names.
+This reconciled version incorporates updates from Stories `3.4a` through `3.4e` plus backend companions `3.2a` and `3.3a`, while keeping this plan as the canonical implementation reference.
 
-### Status
+### In Scope
 
-Completed on 2026-02-11.
+- Upload + preview CSV
+- Required/optional field mapping
+- Column grouping for modifier groups
+- Hard rule mapping (`min_quantity`, `max_quantity`, `lead_time_hours`, `order_multiple`)
+- Soft rule mapping (freetext notes via `soft_rule_mappings`)
+- Preview + row-level validation
+- Commit + results
+- Save and reuse mappings (`import_mappings`)
 
-### Implementation
+### Out of Scope (for this wizard)
 
-Define import modes:
+- In-wizard store assignment
+- Order-time rule enforcement
+- Deferred fields listed in Story section 6 (taxable, setup fee, deposits, etc.)
 
-- ITEM_CATALOG
-- MENU_LAYOUT
+---
 
-Define import fields (non-DB-facing keys):
+## 2. Canonical Data Contract (FE/BE)
 
-ITEM_CATALOG:
+### Rule Model Distinction (Hard vs Soft)
 
-- item_name (required)
-- sku
-- item_description
-- base_price (required)
-- is_active
+- Hard rules persist to `menu_item_rules` and are enum-typed (`rule_type`, `value`), machine-interpretable, and candidates for future runtime enforcement.
+- Soft rules persist to `menu_item_soft_rules` and are freetext/user-defined:
+  - `label`
+  - `content`
+  - `is_customer_visible` (default `false`)
+  - `sort_order` (default `0`)
+- Soft rules are display-only and are candidates for promotion to hard rule enum types as stable patterns emerge.
 
-MENU_LAYOUT:
+## 2.1 Field Mapping
 
-- menu_name (required)
-- category_name
-- category_sort_order
-- item_name (required)
-- sku
-- item_description
-- base_price
-- menu_price_override
-- display_name
-- sort_order
-- is_active
+### Required fields
 
-Expose as:
+- `item_name`
+- `base_price`
+
+### Optional fields
+
+- `description`
+- `category`
+- `price_unit`
+- `serving_description`
+- `sku`
+- `dietary_tags`
+- `allergens`
+- `sort_order`
+
+## 2.2 Modifier Group Bundles
+
+Each bundle maps a related set of CSV columns:
+
+```json
 {
-"version": 1,
-"mode": "MENU_LAYOUT",
-"required_fields": [...],
-"optional_fields": [...]
+  "name_column": "OptionGroup1Name",
+  "choices_column": "OptionGroup1Choices",
+  "pricing_column": "OptionGroup1Pricing",
+  "min_column": "OptionGroup1Min",
+  "max_column": "OptionGroup1Max",
+  "choice_delimiter": "|"
 }
+```
 
-### Acceptance Criteria
+Rules:
 
-- FE and BE share stable contract.
-- Required fields enforced at API layer.
-- Versioned for future-proofing.
+- `name_column` and `choices_column` are required for a valid bundle.
+- Empty/NULL `name_column` for a row means “skip this modifier group for this row.”
+- `pricing_column` is optional; missing price defaults to `0`.
 
-### Completion Notes (2026-02-11)
+## 2.3 Rule Mappings
 
-- Backend source-of-truth registry added at `ordersight/internal/domain/menuimport/contract.go` with:
-  - version `1`
-  - modes `ITEM_CATALOG` and `MENU_LAYOUT`
-  - deterministic `required_fields` + `optional_fields`
-  - required-field mapping validation helpers for API-layer enforcement.
-- Backend endpoint added: `GET /api/v1/imports/menus/fields?mode=ITEM_CATALOG|MENU_LAYOUT`.
-- Frontend now consumes backend contract via `ordersight-fe/src/services/menuImport.ts`.
-- CSV import modal now loads and displays both mode contracts from backend (`ordersight-fe/src/components/menus/ImportMenusCsvModal.tsx`) so FE uses the same contract object BE serves.
+Rules are mapped per-column:
 
----
-
-# EPIC E2 — CSV Parsing & Prepare Flow
-
-## Story 2 — Backend CSV Parsing Utility
-
-### Endpoint
-
-POST /imports/menus/parse
-
-### Response
-
+```json
 {
-"headers": ["Menu", "Category", "Item", "Price"],
-"row_count": 120,
-"sample_rows": [{...}]
+  "min_quantity": "MinOrder",
+  "max_quantity": "MaxOrder",
+  "lead_time_hours": "LeadTimeHours",
+  "order_multiple": "OrderMultiple"
 }
+```
 
-### Constraints
+Rules:
 
-- Max 10MB
-- Max 10k rows
-- UTF-8 only
+- Empty/NULL mapped cell means “rule absent for this row.”
+- Backend validates numeric semantics; invalid values return row-level errors.
+- Rule value semantics:
+  - `min_quantity`: integer `>= 1`
+  - `max_quantity`: integer `>= 1` and `>= min_quantity` when both exist
+  - `lead_time_hours`: integer `>= 0`
+  - `order_multiple`: integer `>= 2` (`1` is a no-op and should be rejected)
 
-### Acceptance Criteria
+## 2.4 Soft Rule Mappings
 
-- Proper header detection.
-- Graceful malformed CSV handling.
-- Limits enforced.
+Soft rules are mapped as column-to-label pairs:
 
----
+```json
+[
+  { "column": "Notes", "label": "Operator Notes" },
+  { "column": "AvailabilityDays", "label": "Availability" }
+]
+```
 
-## Story 3 — Column Mapper UI (React Aria)
+Rules:
 
-### Goal
+- Each row maps to `{ label, content }`, where `content` comes from the mapped column.
+- Empty/NULL mapped cell means “soft rule absent for this row.”
+- Imported soft rules default to `is_customer_visible = false`.
+- No uniqueness is required for soft rule labels.
 
-Allow user to map CSV headers → Import Fields.
+## 2.5 Mapping Payload Shape
 
-### UX Structure
+`POST /api/imports/csv/:session_id/map`
 
-- Required fields section
-- Optional fields (collapsible)
-- Combobox per field
-- Auto-suggestion based on fuzzy header match
-
-### Acceptance Criteria
-
-- Required mappings must be complete before proceeding.
-- Users can override auto-detected mappings.
-- Mapping state preserved when navigating back.
-
----
-
-## Story 4 — Prepare Endpoint (Preview + Validation)
-
-### Endpoint
-
-POST /imports/menus/prepare
-
-### Request
-
+```json
 {
-"mode": "MENU_LAYOUT",
-"mapping": {
-"menu_name": "Menu",
-"category_name": "Category",
-"item_name": "Item",
-"base_price": "Price"
+  "required": {
+    "item_name": "ItemName",
+    "base_price": "BasePrice"
+  },
+  "optional": {
+    "description": "Description",
+    "category": "Category",
+    "price_unit": "PriceUnit",
+    "serving_description": "ServingDescription",
+    "sku": "Sku",
+    "dietary_tags": "DietaryTags",
+    "allergens": "Allergens",
+    "sort_order": "SortOrder"
+  },
+  "modifier_group_bundles": [
+    {
+      "name_column": "OptionGroup1Name",
+      "choices_column": "OptionGroup1Choices",
+      "pricing_column": "OptionGroup1Pricing",
+      "min_column": "OptionGroup1Min",
+      "max_column": "OptionGroup1Max",
+      "choice_delimiter": "|"
+    }
+  ],
+  "rule_mappings": {
+    "min_quantity": "MinOrder",
+    "lead_time_hours": "LeadTimeHours"
+  },
+  "soft_rule_mappings": [
+    { "column": "Notes", "label": "Operator Notes" },
+    { "column": "AvailabilityDays", "label": "Availability" }
+  ]
 }
-}
+```
 
-### Response
+## 2.6 Preview Contract Expectations
 
-{
-"preview_rows": [...],
-"issues": [
-{
-"row": 12,
-"field": "base_price",
-"code": "INVALID_MONEY",
-"message": "Cannot parse '$abc'"
-}
-],
-"estimated_creates": {
-"menus": 1,
-"categories": 6,
-"items": 42,
-"memberships": 42
-}
-}
+Validated preview data must include, per row:
 
-### Acceptance Criteria
-
-- No DB writes occur.
-- Validation errors are row-specific.
-- Required fields missing produce blocking error.
+- normalized item payload
+- resolved modifier groups (`name`, `min_selections`, `max_selections`, `options[]`)
+- resolved rules (`rule_type`, `value`)
+- resolved soft rules (`label`, `content`, `is_customer_visible`, `sort_order`)
+- row-level validation errors (if any)
 
 ---
 
-# EPIC E3 — Commit as Import Job
+## 3. UX Flow (Stories 3.4a-3.4e)
 
-## Story 5 — Create Import Job
+## Step 1 — Upload & Preview (`3.4a`)
 
-### Endpoint
+### User goal
 
-POST /imports/menus/commit
+Confirm the selected CSV before mapping.
 
-### Response
+### UI
 
-{
-"job_id": "uuid"
-}
-
-### Job State Machine
-
-- queued
-- processing
-- completed
-- failed
-
-### Acceptance Criteria
-
-- Job created instantly.
-- Raw CSV + mapping persisted.
-- Pollable via GET /imports/:job_id.
-
----
-
-## Story 6 — Import Processor (MENU_LAYOUT Mode)
-
-### Invariants
-
-- Org isolation via composite FKs.
-- Unique active menu names per org.
-- Unique category names per menu.
-- SKU uniqueness per org.
-
-### Pseudocode
-
-For each row:
-Begin transaction
-
-menu = find_or_create_menu(org_id, menu_name)
-
-category = find_or_create_category(menu_id, category_name)
-
-item = upsert_menu_item(org_id, sku, name, description, base_price)
-
-upsert menu_item_in_menu with: - org_id - menu_id - menu_item_id - category_id - overrides - sort_order
-
-Commit
-
-### Acceptance Criteria
-
-- Re-running same CSV is idempotent.
-- No duplicate menu_items created.
-- FK violations impossible under correct logic.
-
----
-
-## Story 7 — Import Processor (ITEM_CATALOG Mode)
+- `FileTrigger`
+- optional `DropZone`
+- preview table (first 10 rows)
+- file metadata (name, size, row count)
 
 ### Behavior
 
-Upsert menu_items only.
-
-Match priority:
-
-1. SKU (if provided)
-2. Normalized name
-
-### Acceptance Criteria
-
-- Deterministic upserts.
-- SKU constraint respected.
-- Name collision produces warning.
+- Parse client-side (Papa Parse or equivalent)
+- Show CSV headers verbatim from the uploaded file (no FE renaming/normalization in Step 1 UI)
+- Reject:
+  - non-CSV
+  - empty files
+  - files over `5MB`
+- Cancel returns to the menu item list.
+- Next goes to field mapping
 
 ---
 
-# EPIC E4 — Store Assignment Flow
+## Step 2 — Required & Optional Mapping (`3.4b`)
 
-## Story 8 — Assign Menu to Store
+### User goal
 
-### Endpoint
+Map CSV headers to menu item fields.
 
-PUT /stores/:store_id/menus
+### UI
 
-### Behavior
+- Required field section
+- Optional field section
+- dropdown or drag-target assignment
+- per-field 3-row sample preview
 
-- Assign multiple menus
-- Enforce single primary via DB unique partial index
+### Rules
 
-### Acceptance Criteria
-
-- Exactly one primary per store.
-- Changing primary clears previous primary.
-
----
-
-# EPIC E5 — UX Completion + Hardening
-
-## Story 9 — Import Progress UI
-
-### Endpoint
-
-GET /imports/:job_id
-
-### Response
-
-{
-"status": "processing",
-"created": { ... },
-"warnings": 12,
-"errors": 0
-}
-
-### Acceptance Criteria
-
-- User sees live progress.
-- Final summary displayed clearly.
+- Required fields must be mapped to proceed.
+- One CSV column may map to only one destination.
+- Unmapped columns carry forward to Step 3.
+- Back returns to upload.
 
 ---
 
-## Story 10 — Error Report CSV
+## Step 3 — Column Grouping for Modifier Groups + Hard/Soft Rules (`3.4c`)
 
-### Endpoint
+### User goal
 
-GET /imports/:job_id/errors.csv
+Convert remaining columns into structured modifier bundles, hard rules, and soft rules.
 
-### Acceptance Criteria
+### UI
 
-- Downloadable CSV contains row_number + error_code + message.
-- Users can fix and re-upload.
+- list of unmapped columns
+- “Create modifier group bundle” card builder
+- hard-rule/soft-rule mapping action for remaining columns
+- 2-3 row preview per bundle
 
----
+### Modifier bundle card slots
 
-# First Principles Checklist
+- Group Name (required)
+- Choices (required)
+- Pricing (optional)
+- Min Selections (optional)
+- Max Selections (optional)
 
-Before coding each story:
+### Rule mapping
 
-1. What invariant does this story protect?
-2. What failure mode are we preventing?
-3. Is the database constraint doing the heavy lifting?
-4. Is this behavior observable in logs and UI?
-5. Would this still work at 1,000 orgs?
+- map each remaining column to one rule type:
+  - `min_quantity`
+  - `max_quantity`
+  - `lead_time_hours`
+  - `order_multiple`
+- interaction label: `Map as Rule`
+- UI hint for `order_multiple`: _"Use 2 or greater. A value of 1 has no effect and is invalid."_
 
-Never implement behavior because “that’s how imports are usually done.”
-Always reason from:
+### Soft rule mapping
 
-- Schema constraints
-- Product invariants
-- UX clarity
-- Idempotency and safety
+- map remaining columns to notes by setting:
+  - `column` (source column)
+  - `label` (default to column header; editable)
+- interaction label: `Map as Note`
+- each non-empty row value becomes soft rule `content` for that item.
+- empty/NULL cell means no soft rule for that row.
 
----
+### Completion
 
-# Done Criteria for Entire Feature
+- Remaining columns can be skipped.
+- User can proceed with zero modifier bundles, zero hard rules, and zero soft rules.
 
-- Org admin can upload CSV.
-- Map columns.
-- Preview with validation.
-- Commit import.
-- See deterministic results.
-- Assign menu to store.
-- Take an order successfully using imported menu.
+### Delimiter handling
 
-Time-to-first-menu target: < 5 minutes.
-
----
-
-# Appendix — UI/UX + React Aria Wizard Guide
-
-# Menu CSV Import Wizard — UI/UX + React Aria Components Guide (Companion)
-
-This document is a **UX-focused companion** to `menu_csv_import_implementation_plan.md`. It maps each wizard step to **React Aria Components** (RAC) and includes interaction patterns, validation behaviors, and accessibility considerations.
-
-> Engineering Directive (repeat, because it matters): Implement from **first principles**, not cargo cult programming.
->
-> - UX first principles: reduce cognitive load, make the next action obvious, provide fast feedback, preserve user control, and prevent irreversible mistakes.
+- auto-detect delimiter (`|`, `;`, `/`)
+- user override allowed
 
 ---
 
-## Goals
+## Step 4 — Preview & Confirm (`3.4d`)
 
-1. **Time-to-first-menu < 5 minutes** for the common case.
-2. **High trust**: users understand what will happen before it happens.
-3. **Low friction**: accepts real-world CSV messiness while guiding the user.
-4. **Accessible**: full keyboard support, screen reader friendly, clear error messaging.
+### User goal
 
----
+See exactly what will be created/reused and catch errors before commit.
 
-## Wizard Structure (recommended)
+### UI
 
-A multi-step “wizard” with **explicit steps**, persisted state, and a single forward path:
+- structured item preview grouped by category (if mapped)
+- each item shows:
+  - Name, Price, Description
+  - SKU, serving description, dietary tags, allergens
+  - Hard Rules
+  - Soft Rules
+  - Modifier groups + options + price adjustments
+- error section for invalid rows
+- summary bar
 
-1. **Choose Import Type**
-2. **Upload CSV**
-3. **Map Columns**
-4. **Preview & Validate**
-5. **Commit Import**
-6. **Results**
-7. _(Optional)_ **Assign Menus to Stores**
+### Validation/insight requirements
 
-### React Aria approach
-
-RAC doesn’t ship a Stepper component, so implement the wizard as:
-
-- **State machine in code** (`step` enum) + a visual progress indicator, or
-- **Tabs** as steps (disabled except current / completed), or
-- **ListBox** as a step nav (left rail) with the current panel on the right.
-
-**Recommendation:** A _state-machine wizard_ + **ProgressBar** + “Back/Next” buttons.
-
-- Clear, linear, prevents users skipping required steps
-- Easy to disable Next if validations fail
+- row-level errors surfaced clearly
+- duplicate item detection (name and/or SKU if mapped)
+- duplicate item action must be explicit: `skip duplicates` or `import all`
+- rule validation errors must include concrete guidance (e.g., "`order_multiple` must be an integer >= 2")
+- summary bar must include counts for: total items, items with errors, modifier groups, hard rules (and soft rules if available)
+- structural dedup behavior for modifier groups reflected in preview:
+  - same name + same option set => shared group
+  - same name + different options => distinct groups
 
 ---
 
-## Component Cheatsheet (RAC)
+## Step 5 — Commit + Results (`3.4d` + `3.3a`)
 
-### Primary building blocks
+### User goal
 
-- `Form` – wrap each step for validation + submission semantics
-- `Button` – primary/secondary actions
-- `Heading`, `Text` – consistent page scaffolding
-- `RadioGroup` – mode selection (Item Catalog vs Menu Layout)
-- `FileTrigger` – file picker
-- `DropZone` – drag & drop (optional but highly ergonomic)
-- `Table` – preview rows
-- `ComboBox` + `ListBox` – mapping controls (field → column)
-- `Checkbox`, `Switch` – optional toggles (e.g., “treat blanks as inactive”)
-- `Dialog` / `Modal` – confirm commit, show blocking errors, show “are you sure?”
-- `Toast` (if you have one) – success/warning summaries
-- `ProgressBar` – job progress or step progress
+Run import and review deterministic results.
 
-### Supporting components
+### UI
 
-- `TextField` – “menu name default” when mode lacks menu name
-- `Tooltip` – explain tricky fields (SKU matching, price parsing)
-- `Popover` – mapping help or field examples
+- Import action
+- post-commit results summary
+
+### Required result metrics
+
+- items created
+- items updated (if applicable)
+- modifier groups created
+- modifier groups reused
+- hard rules created
+- soft rules created (if returned by backend summary)
+- rows skipped/errored
 
 ---
 
-## Step-by-step UX + Components
+## Step 6 — Save & Reuse Mapping (`3.4e`)
 
-## Step 1: Choose Import Type
+### User goal
 
-### UX intent
+Avoid remapping for recurring spreadsheet formats.
 
-Users shouldn’t have to understand your schema. Present two plain-English options:
+### Save prompt
 
-- **Menu layout (recommended)**: “My spreadsheet is basically the menu.”
-- **Item catalog**: “I have a master list of items; I’ll build menus later.”
+After successful import:
 
-### Components
+- prompt to save mapping
+- optional mapping name (default from file name)
 
-- `Heading`, `Text`
-- `RadioGroup` with two options
-- Optional: `Card` styling in your design system, but RAC-wise keep it semantic
+### Saved mapping contents
 
-### Acceptance UX
+- Step 2 field mappings
+- Step 3 modifier bundles
+- Step 3 hard rule mappings
+- Step 3 soft rule mappings
+- delimiter choice/override
 
-- Default to **Menu layout**.
-- Provide a short “What you’ll need” bullet list under each option.
+### Retrieval behavior
 
----
+On future uploads:
 
-## Step 2: Upload CSV
+- offer saved mappings list
+- if headers fully match, skip to preview
+- if partial mismatch, fall back to mapping flow with compatible columns prefilled
 
-### UX intent
+### Backend contract
 
-Minimize failure:
+- `POST /api/v1/imports/mappings`
+- `GET /api/v1/imports/mappings`
+- `PATCH /api/v1/imports/mappings/:id` (rename)
+- `DELETE /api/v1/imports/mappings/:id`
 
-- show file requirements and a sample template link
-- handle errors immediately (bad CSV, too big, empty headers)
+Org scoping is derived from the authenticated org context on the backend.
 
-### Components
-
-- `FileTrigger` (required)
-- `DropZone` (recommended)
-- `Text` for constraints and tips
-- `Button` for “Download template CSV”
-
-### Behaviors
-
-- As soon as file is selected, call `POST /imports/menus/parse`.
-- Show:
-  - file name, size
-  - detected headers count
-  - row count
-- If parse fails, show an error summary and allow re-upload.
-
-### Nice touch
-
-If headers are missing, offer:
-
-- “Use first row as headers” toggle (only if you support it)
-- Otherwise: explain how to fix
+Storage table: `import_mappings` (`menu_system_ddl.sql`).
 
 ---
 
-## Step 3: Map Columns (the heart of usability)
+## 4. React Aria Component Mapping
 
-### UX intent
+Recommended RAC components by step:
 
-Users think: “My Column Q is Item Name.”
-You think: “`import_field=item_name` maps to `csv_header=Column Q`.”
+- Upload: `FileTrigger`, `DropZone`, `Button`, `Table`, `Text`
+- Field mapping: `Form`, `ComboBox`, `ListBox`, `Text`, `Tooltip`
+- Grouping: `Form`, `ComboBox`, `Button`, `TextField`, `Table`
+- Preview: `Table`, `Tabs` or segmented controls, `Checkbox`, `Text`
+- Commit/results: `Dialog`, `Button`, `ProgressBar`, `Text`
+- Saved mappings: `ComboBox`, `ListBox`, `Dialog`, `Button`
 
-You want the **internal fields-first UI**:
+Wizard shell:
 
-- left: internal fields (required + optional)
-- right: mapping dropdown to pick CSV column
-- below: immediate sample value preview from mapped column
-
-### Components
-
-- `Form`
-- `ComboBox` for each internal field (source: CSV headers)
-- `Table` (or simple `ListBox`) for showing header list
-- `Text` for “required” and inline descriptions
-- `Tooltip` for tricky ones (prices, booleans, SKU matching)
-
-### Suggested layout
-
-**Required fields (always visible)**
-
-- Menu Name (required in menu layout)
-- Item Name (required)
-- Base Price (required for item catalog; optional for menu layout if you allow price override only)
-
-**Optional fields (collapsible section)**
-
-- SKU, Description, Active flags, Sort orders, Display name override, etc.
-
-### Auto mapping
-
-When parse results return headers:
-
-- Try fuzzy match:
-  - “Item”, “Item Name” → Item Name
-  - “Cost”, “Price” → Base Price
-  - “Section”, “Category” → Category Name
-- Pre-fill and let user edit.
-
-### Validation UX
-
-- “Next” is disabled until all required fields mapped.
-- If two internal fields map to the same CSV header and that’s invalid (e.g., item_name and menu_name), show inline error.
+- controlled step state machine + linear Back/Next actions
+- no free skipping of incomplete steps
 
 ---
 
-## Step 4: Preview & Validate
-
-### UX intent
-
-Build trust: show what will be created/updated and highlight problems.
-
-### Components
-
-- `Heading`, `Text`
-- `Table` for preview rows (first N)
-- `Checkbox` for “Show only rows with issues”
-- `Tabs` for views:
-  - Preview
-  - Issues (errors/warnings list)
-  - Summary (counts)
-
-_(Tabs are optional; a segmented UI works too.)_
-
-### Preview table features
-
-- Sticky header
-- Column showing “Status” per row:
-  - ✅ OK
-  - ⚠️ Warning
-  - ❌ Error
-- Inline cell highlighting for invalid parse fields (price, boolean, missing required)
-
-### Issue list UX
-
-Group issues by:
-
-- Blocking errors
-- Warnings
-
-Each issue should include:
-
-- row number
-- field
-- message
-- hint (“Expected currency like 12.50 or 1250”)
-
-### Acceptance UX
-
-- If blocking errors exist: disable “Commit” and present “Fix mapping” + “Download errors CSV” (if you support it pre-commit).
-- If warnings only: allow commit but require explicit acknowledgment:
-  - checkbox “Proceed with warnings” or confirmation dialog.
-
----
-
-## Step 5: Commit Import
-
-### UX intent
-
-Prevent “oops” and set expectations.
-
-### Components
-
-- `Dialog` / `Modal` (confirm commit)
-- `Button` primary: “Start Import”
-- `ProgressBar` after commit begins
-
-### Confirmation dialog content (recommended)
-
-- Show summary:
-  - `+X menus`, `+Y categories`, `+Z items`, `+W memberships`
-- Show matching behavior:
-  - “We will match by SKU when present; otherwise by name.”
-- Optional toggles:
-  - “Don’t update existing items; create only” (future feature)
-
----
-
-## Step 6: Import Progress + Results
-
-### UX intent
-
-Make it observable and calm. Imports can take time; user needs confidence.
-
-### Components
-
-- `ProgressBar` (indeterminate until BE provides percent; otherwise show staged progress)
-- `Text` status + counts updating
-- `Button` “Run in background” (just navigates away while job continues)
-- `Button` “Download error report” if failed
-
-### Status presentation
-
-- queued / processing / completed / failed
-- show start time + elapsed
-- show counts created/updated and warning/error counts
-
-### Results page
-
-- Completed:
-  - “Go assign menus to stores”
-  - “View menus”
-- Failed:
-  - error summary + error report download
-  - “Fix CSV and try again” CTA
-
----
-
-## Step 7 (Optional but recommended): Assign Menu(s) to Store(s)
-
-### UX intent
-
-Users want: “Make this menu live for my store.”
-
-### Components
-
-- `ComboBox` to pick store
-- `ListBox` or `Table` to select menus
-- `Checkbox` for “Set as primary”
-- `Dialog` confirm changing primary menu if one exists
-
-### UX behavior
-
-- If the org has only one store: default-select it.
-- If they imported exactly one menu: auto-select it.
-- Make “Set as primary” prominent.
-
----
-
-## Validation & Messaging Principles (UX)
-
-1. **Prefer inline errors** over global banners.
-2. **Never surprise the user**: show summary before commit.
-3. **Don’t block on warnings** — but require acknowledgment.
-4. **Use consistent terminology** (“Item Name”, not “menu_items.name”).
-
-### RAC validation approach
-
-- Use `Form` + field-level validation messages.
-- Treat missing required mapping as a field-level error on that mapping control.
-
----
-
-## Accessibility Considerations (RAC strengths)
-
-- Ensure focus moves to the next step heading on step transition.
-- Ensure Dialogs trap focus and have clear primary action.
-- Table should be keyboard navigable; keep row count limited in preview to avoid fatigue.
-- Provide non-color indicators for errors (icons + text).
-
----
-
-## Suggested Wizard State Model (frontend)
-
-A simple state object persisted across steps:
+## 5. Frontend State Model (Suggested)
 
 ```ts
-type ImportMode = 'ITEM_CATALOG' | 'MENU_LAYOUT';
+type RuleType = 'min_quantity' | 'max_quantity' | 'lead_time_hours' | 'order_multiple';
+type SoftRuleMapping = { column: string; label: string };
+
+type ModifierGroupBundle = {
+  id: string;
+  nameColumn?: string;
+  choicesColumn?: string;
+  pricingColumn?: string;
+  minColumn?: string;
+  maxColumn?: string;
+  choiceDelimiter: string;
+};
 
 type ImportWizardState = {
-  mode: ImportMode;
   file?: File;
-  parse?: { headers: string[]; rowCount: number; sampleRows: Record<string, string>[] };
+  headers: string[];
+  sampleRows: Record<string, string>[];
+  rowCount: number;
 
-  mapping: Record<string /* importFieldKey */, string /* csvHeader */>;
+  requiredMappings: Record<'item_name' | 'base_price', string | undefined>;
+  optionalMappings: Partial<
+    Record<
+      | 'description'
+      | 'category'
+      | 'price_unit'
+      | 'serving_description'
+      | 'sku'
+      | 'dietary_tags'
+      | 'allergens'
+      | 'sort_order',
+      string
+    >
+  >;
 
-  prepare?: {
-    previewRows: any[];
-    issues: {
+  modifierGroupBundles: ModifierGroupBundle[];
+  ruleMappings: Partial<Record<RuleType, string>>;
+  softRuleMappings: SoftRuleMapping[];
+
+  preview?: {
+    rows: unknown[];
+    summary: {
+      totalItems: number;
+      itemsWithErrors: number;
+      modifierGroupsToCreate: number;
+      rulesToCreate: number;
+      softRulesToCreate?: number;
+    };
+    errors: Array<{
       row: number;
       field: string;
       code: string;
       message: string;
       severity: 'error' | 'warning';
-    }[];
-    estimatedCreates: Record<string, number>;
+    }>;
   };
 
-  commit?: { jobId: string };
-  job?: {
-    status: string;
-    created: Record<string, number>;
-    updated: Record<string, number>;
-    warnings: number;
-    errors: number;
+  commit?: {
+    status: 'idle' | 'running' | 'completed' | 'failed';
+    results?: Record<string, number>;
   };
+
+  savedMappingId?: string;
 };
 ```
 
-_(Keep the mapping keys tied to your Import Field contract version.)_
+---
+
+## 6. Acceptance Checklist
+
+- Required mappings block progress until valid.
+- Modifier bundle cards support multiple bundles.
+- Rule mapping supports all current enum values.
+- Soft rule mapping supports column + label configuration.
+- Preview shows new menu item fields, hard rules, and soft rules.
+- Row errors are explicit and actionable.
+- Import results include created/reused modifier group counts.
+- Saved mapping flow works for full-match and partial-match headers.
+- Keyboard navigation and screen reader labels are complete.
 
 ---
 
-## What NOT to do (common “cargo cult” traps)
+## 7. Implementation Sequence
 
-- ❌ A wizard that lets users click “Next” but fails later without clear reason.
-- ❌ A mapper UI that maps CSV columns directly to DB columns.
-- ❌ A preview that shows raw values but not what will be created/updated.
-- ❌ A commit step that blocks for a long time without progress feedback.
-- ❌ Forcing users to understand “org_id/menu_item_in_menu” vocabulary.
-
----
-
-## Definition of Done (UX)
-
-- A non-technical user can import a menu from a spreadsheet **without reading docs**.
-- The mapping step is understandable in < 60 seconds.
-- Preview clearly explains what will happen and what needs fixing.
-- Job progress is observable; failures are actionable via downloadable report.
-- After completion, user can assign a primary menu to a store.
+1. Build Step 1 + Step 2 UI with state persistence.
+2. Add Step 3 bundle/hard-rule/soft-rule mapping interactions.
+3. Wire mapping payload to `POST /api/imports/csv/:session_id/map`.
+4. Implement Step 4 preview/error rendering.
+5. Implement commit/results metrics rendering.
+6. Add save/reuse mapping UX + endpoints.
+7. Add integration tests for:
+   - duplicate modifier names with different option sets
+   - rule parsing failures
+   - soft-rule mapping with empty-cell skip behavior
+   - header mismatch fallback for saved mappings
 
 ---
+
+## 8. Deliberate Deferrals
+
+Per this plan's scoped deferrals (aligned to the latest story updates), these remain out of this feature slice:
+
+- taxable logic
+- setup/deposit fields
+- utensils included
+- included-with relationships
+- day/date availability scheduling

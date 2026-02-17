@@ -2,12 +2,18 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const postJSONMock = vi.fn();
 const apiPostMock = vi.fn();
+const getJSONMock = vi.fn();
+const patchJSONMock = vi.fn();
+const delJSONMock = vi.fn();
 
 vi.mock('../http', () => ({
   api: {
     post: (...args: unknown[]) => apiPostMock(...args),
   },
+  getJSON: (...args: unknown[]) => getJSONMock(...args),
   postJSON: (...args: unknown[]) => postJSONMock(...args),
+  patchJSON: (...args: unknown[]) => patchJSONMock(...args),
+  delJSON: (...args: unknown[]) => delJSONMock(...args),
 }));
 
 describe('menuImport service', () => {
@@ -98,5 +104,103 @@ describe('menuImport service', () => {
       error_count: 0,
       errors: [],
     });
+  });
+
+  test('lists saved mappings with /imports/mappings', async () => {
+    getJSONMock.mockResolvedValue({
+      mappings: [
+        {
+          id: 'map-1',
+          org_id: 'org-1',
+          name: 'Catering Sheet',
+          mapping: {
+            expected_columns: ['ItemName', 'Price'],
+            field_mappings: { item_name: 'ItemName', base_price: 'Price' },
+            modifier_group_bundles: [],
+            remaining_decisions: {},
+          },
+          created_by: 'user-1',
+          created_at: '2026-02-17T00:00:00Z',
+          updated_at: '2026-02-17T00:00:00Z',
+        },
+      ],
+    });
+
+    const { listMenuImportMappings } = await import('../menuImport');
+    const result = await listMenuImportMappings();
+
+    expect(getJSONMock).toHaveBeenCalledWith('/imports/mappings');
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Catering Sheet');
+    expect(result[0].mapping.field_mappings.item_name).toBe('ItemName');
+  });
+
+  test('creates saved mapping with /imports/mappings', async () => {
+    postJSONMock.mockResolvedValue({
+      mapping: {
+        id: 'map-2',
+        org_id: 'org-1',
+        name: 'Weekly Import',
+        mapping: {
+          expected_columns: ['ItemName', 'Price'],
+          field_mappings: { item_name: 'ItemName', base_price: 'Price' },
+          modifier_group_bundles: [],
+          remaining_decisions: {},
+        },
+        created_by: 'user-1',
+        created_at: '2026-02-17T00:00:00Z',
+        updated_at: '2026-02-17T00:00:00Z',
+      },
+    });
+
+    const { createMenuImportMapping } = await import('../menuImport');
+    const result = await createMenuImportMapping('Weekly Import', {
+      expected_columns: ['ItemName', 'Price'],
+      field_mappings: { item_name: 'ItemName', base_price: 'Price' },
+      modifier_group_bundles: [],
+      remaining_decisions: {},
+    });
+
+    expect(postJSONMock).toHaveBeenCalledWith('/imports/mappings', {
+      name: 'Weekly Import',
+      mapping: {
+        expected_columns: ['ItemName', 'Price'],
+        field_mappings: { item_name: 'ItemName', base_price: 'Price' },
+        modifier_group_bundles: [],
+        remaining_decisions: {},
+      },
+    });
+    expect(result.id).toBe('map-2');
+  });
+
+  test('renames and deletes saved mapping', async () => {
+    patchJSONMock.mockResolvedValue({
+      mapping: {
+        id: 'map-2',
+        org_id: 'org-1',
+        name: 'Renamed Mapping',
+        mapping: {
+          expected_columns: [],
+          field_mappings: {},
+          modifier_group_bundles: [],
+          remaining_decisions: {},
+        },
+        created_by: 'user-1',
+        created_at: '2026-02-17T00:00:00Z',
+        updated_at: '2026-02-17T00:00:00Z',
+      },
+    });
+    delJSONMock.mockResolvedValue({});
+
+    const { renameMenuImportMapping, deleteMenuImportMapping } = await import('../menuImport');
+
+    const renamed = await renameMenuImportMapping('map-2', 'Renamed Mapping');
+    await deleteMenuImportMapping('map-2');
+
+    expect(patchJSONMock).toHaveBeenCalledWith('/imports/mappings/map-2', {
+      name: 'Renamed Mapping',
+    });
+    expect(delJSONMock).toHaveBeenCalledWith('/imports/mappings/map-2');
+    expect(renamed.name).toBe('Renamed Mapping');
   });
 });
