@@ -99,6 +99,13 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: 'menus',
+            lazy: async () => {
+              const mod = await import('./pages/stores/StoreMenusPage');
+              return { Component: mod.StoreMenusPage };
+            },
+          },
+          {
             path: 'team',
             lazy: async () => {
               const mod = await import('./pages/stores/StoreTeamPage');

@@ -87,6 +87,63 @@ describe('menus service', () => {
     });
   });
 
+  test('lists store menus from /stores/:id/menus', async () => {
+    getJSONMock.mockResolvedValue([
+      {
+        id: 'menu-2',
+        org_id: 'org-1',
+        name: 'Store Lunch',
+        is_active: true,
+        is_primary: false,
+        assigned_at: '2026-02-01T15:04:05Z',
+      },
+    ]);
+
+    const { listStoreMenus } = await import('../menus');
+    const result = await listStoreMenus('store-77');
+
+    expect(getJSONMock).toHaveBeenCalledWith('/stores/store-77/menus');
+    expect(result).toEqual([
+      {
+        id: 'menu-2',
+        org_id: 'org-1',
+        name: 'Store Lunch',
+        description: null,
+        is_active: true,
+        is_primary: false,
+        assigned_at: '2026-02-01T15:04:05Z',
+        created_at: undefined,
+        updated_at: undefined,
+      },
+    ]);
+  });
+
+  test('lists menu stores from /menus/:id/stores', async () => {
+    getJSONMock.mockResolvedValue([
+      {
+        store_id: 'store-77',
+        org_id: 'org-1',
+        name: 'Downtown',
+        is_primary: false,
+        assigned_at: '2026-02-01T15:04:05Z',
+      },
+    ]);
+
+    const { listMenuStores } = await import('../menus');
+    const result = await listMenuStores('menu-2');
+
+    expect(getJSONMock).toHaveBeenCalledWith('/menus/menu-2/stores');
+    expect(result).toEqual([
+      {
+        store_id: 'store-77',
+        org_id: 'org-1',
+        name: 'Downtown',
+        is_primary: false,
+        assigned_at: '2026-02-01T15:04:05Z',
+      },
+    ]);
+  });
+
   test('creates a menu via /menus', async () => {
     postJSONMock.mockResolvedValue({
       id: 'menu-9',
@@ -138,5 +195,72 @@ describe('menus service', () => {
     const { deleteMenu } = await import('../menus');
     await deleteMenu('menu-11');
     expect(delJSONMock).toHaveBeenCalledWith('/menus/menu-11');
+  });
+
+  test('assigns menu to store via /stores/:id/menus', async () => {
+    postJSONMock.mockResolvedValue({
+      store_id: 'store-77',
+      menu_id: 'menu-2',
+      is_primary: false,
+    });
+
+    const { assignStoreMenu } = await import('../menus');
+    const result = await assignStoreMenu('store-77', 'menu-2');
+
+    expect(postJSONMock).toHaveBeenCalledWith('/stores/store-77/menus', { menu_id: 'menu-2' });
+    expect(result).toEqual({
+      store_id: 'store-77',
+      menu_id: 'menu-2',
+      is_primary: false,
+      created_at: undefined,
+    });
+  });
+
+  test('assigns menu to multiple stores via /menus/:id/stores/bulk', async () => {
+    postJSONMock.mockResolvedValue({
+      results: [
+        {
+          store_id: 'store-77',
+          menu_id: 'menu-2',
+          is_primary: false,
+        },
+        {
+          store_id: 'store-88',
+          menu_id: 'menu-2',
+          is_primary: false,
+        },
+      ],
+    });
+
+    const { assignMenuStoresBulk } = await import('../menus');
+    const result = await assignMenuStoresBulk('menu-2', ['store-77', 'store-88']);
+
+    expect(postJSONMock).toHaveBeenCalledWith('/menus/menu-2/stores/bulk', [
+      { store_id: 'store-77' },
+      { store_id: 'store-88' },
+    ]);
+    expect(result).toEqual({
+      results: [
+        {
+          store_id: 'store-77',
+          menu_id: 'menu-2',
+          is_primary: false,
+          created_at: undefined,
+        },
+        {
+          store_id: 'store-88',
+          menu_id: 'menu-2',
+          is_primary: false,
+          created_at: undefined,
+        },
+      ],
+    });
+  });
+
+  test('removes store-menu assignment via /stores/:id/menus/:menuId', async () => {
+    delJSONMock.mockResolvedValue({});
+    const { removeStoreMenu } = await import('../menus');
+    await removeStoreMenu('store-77', 'menu-2');
+    expect(delJSONMock).toHaveBeenCalledWith('/stores/store-77/menus/menu-2');
   });
 });

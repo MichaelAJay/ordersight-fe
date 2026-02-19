@@ -11,6 +11,37 @@ export interface MenuSummary {
   updated_at?: string;
 }
 
+export interface StoreMenuSummary {
+  id: string;
+  org_id?: string;
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  is_primary?: boolean;
+  assigned_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StoreMenuAssignment {
+  store_id: string;
+  menu_id: string;
+  is_primary: boolean;
+  created_at?: string;
+}
+
+export interface MenuStoreSummary {
+  store_id: string;
+  org_id?: string;
+  name: string;
+  is_primary?: boolean;
+  assigned_at?: string;
+}
+
+export interface AssignMenuStoresBulkResponse {
+  results: StoreMenuAssignment[];
+}
+
 export interface MenuDetail {
   id: string;
   org_id?: string;
@@ -126,6 +157,70 @@ function normalizeMenuDetail(value: unknown): MenuDetail | null {
   };
 }
 
+function normalizeStoreMenuSummary(value: unknown): StoreMenuSummary | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeString(record['id']);
+  const name = normalizeString(record['name']);
+  if (!id || !name) {
+    return null;
+  }
+
+  return {
+    id,
+    org_id: normalizeOptionalString(record['org_id']) ?? undefined,
+    name,
+    description: normalizeOptionalString(record['description']),
+    is_active: typeof record['is_active'] === 'boolean' ? record['is_active'] : undefined,
+    is_primary: typeof record['is_primary'] === 'boolean' ? record['is_primary'] : undefined,
+    assigned_at: normalizeOptionalString(record['assigned_at']) ?? undefined,
+    created_at: normalizeOptionalString(record['created_at']) ?? undefined,
+    updated_at: normalizeOptionalString(record['updated_at']) ?? undefined,
+  };
+}
+
+function normalizeStoreMenuAssignment(value: unknown): StoreMenuAssignment | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const storeID = normalizeString(record['store_id']);
+  const menuID = normalizeString(record['menu_id']);
+  if (!storeID || !menuID) {
+    return null;
+  }
+
+  return {
+    store_id: storeID,
+    menu_id: menuID,
+    is_primary: record['is_primary'] === true,
+    created_at: normalizeOptionalString(record['created_at']) ?? undefined,
+  };
+}
+
+function normalizeMenuStoreSummary(value: unknown): MenuStoreSummary | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const storeID = normalizeString(record['store_id']);
+  const name = normalizeString(record['name']);
+  if (!storeID || !name) {
+    return null;
+  }
+
+  return {
+    store_id: storeID,
+    org_id: normalizeOptionalString(record['org_id']) ?? undefined,
+    name,
+    is_primary: typeof record['is_primary'] === 'boolean' ? record['is_primary'] : undefined,
+    assigned_at: normalizeOptionalString(record['assigned_at']) ?? undefined,
+  };
+}
+
 export async function listMenus(): Promise<MenuSummary[]> {
   const payload = await getJSON<unknown>('/menus');
   if (!Array.isArray(payload)) {
@@ -148,6 +243,44 @@ export async function listMenus(): Promise<MenuSummary[]> {
 export async function getMenuById(menuID: string): Promise<MenuDetail | null> {
   const payload = await getJSON<unknown>(`/menus/${menuID}`);
   return normalizeMenuDetail(payload);
+}
+
+export async function listStoreMenus(storeID: string): Promise<StoreMenuSummary[]> {
+  const payload = await getJSON<unknown>(`/stores/${storeID}/menus`);
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  const menus: StoreMenuSummary[] = [];
+  const seen = new Set<string>();
+  for (const entry of payload) {
+    const normalized = normalizeStoreMenuSummary(entry);
+    if (!normalized || seen.has(normalized.id)) {
+      continue;
+    }
+    seen.add(normalized.id);
+    menus.push(normalized);
+  }
+  return menus;
+}
+
+export async function listMenuStores(menuID: string): Promise<MenuStoreSummary[]> {
+  const payload = await getJSON<unknown>(`/menus/${menuID}/stores`);
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  const stores: MenuStoreSummary[] = [];
+  const seen = new Set<string>();
+  for (const entry of payload) {
+    const normalized = normalizeMenuStoreSummary(entry);
+    if (!normalized || seen.has(normalized.store_id)) {
+      continue;
+    }
+    seen.add(normalized.store_id);
+    stores.push(normalized);
+  }
+  return stores;
 }
 
 export async function createMenu(payload: CreateMenuRequest): Promise<MenuSummary | null> {
@@ -193,6 +326,44 @@ export async function assignMenuItems(
 
 export async function removeMenuItemAssignment(menuID: string, menuItemID: string): Promise<void> {
   await delJSON<unknown>(`/menus/${menuID}/items/${menuItemID}`);
+}
+
+export async function assignStoreMenu(
+  storeID: string,
+  menuID: string,
+): Promise<StoreMenuAssignment | null> {
+  const response = await postJSON<{ menu_id: string }, unknown>(`/stores/${storeID}/menus`, {
+    menu_id: menuID,
+  });
+  return normalizeStoreMenuAssignment(response);
+}
+
+export async function assignMenuStoresBulk(
+  menuID: string,
+  storeIDs: string[],
+): Promise<AssignMenuStoresBulkResponse> {
+  const payload = storeIDs.map((storeID) => ({
+    store_id: storeID,
+  }));
+  const response = await postJSON<typeof payload, unknown>(`/menus/${menuID}/stores/bulk`, payload);
+  const record =
+    response && typeof response === 'object' && !Array.isArray(response)
+      ? (response as Record<string, unknown>)
+      : {};
+  const resultsRaw = Array.isArray(record['results']) ? record['results'] : [];
+  const results: StoreMenuAssignment[] = [];
+  for (const entry of resultsRaw) {
+    const normalized = normalizeStoreMenuAssignment(entry);
+    if (!normalized) {
+      continue;
+    }
+    results.push(normalized);
+  }
+  return { results };
+}
+
+export async function removeStoreMenu(storeID: string, menuID: string): Promise<void> {
+  await delJSON<unknown>(`/stores/${storeID}/menus/${menuID}`);
 }
 
 export async function deleteMenu(menuID: string): Promise<void> {

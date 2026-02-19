@@ -13,15 +13,19 @@ import {
   type PriceUnit,
 } from '@/services/menuItems';
 import {
+  assignMenuStoresBulk,
   assignMenuItems,
   createMenu,
   deleteMenu,
   getMenuById,
+  listMenuStores,
   listMenus,
+  removeStoreMenu,
   removeMenuItemAssignment,
   type MenuDetail,
   type MenuSummary,
 } from '@/services/menus';
+import { listStores, type Store } from '@/services/stores';
 import styles from './MenusPage.module.css';
 
 const CATALOG_LIMIT = 200;
@@ -30,6 +34,10 @@ type DeleteMenuTarget = {
   id: string;
   name: string;
   itemCount?: number;
+};
+type AssignMenuTarget = {
+  id: string;
+  name: string;
 };
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -137,6 +145,14 @@ export function MenusPage() {
   const [deleteMenuTarget, setDeleteMenuTarget] = useState<DeleteMenuTarget | null>(null);
   const [deleteMenuBusy, setDeleteMenuBusy] = useState(false);
   const [deleteMenuError, setDeleteMenuError] = useState<string | null>(null);
+  const [assignMenuTarget, setAssignMenuTarget] = useState<AssignMenuTarget | null>(null);
+  const [assignStoresLoading, setAssignStoresLoading] = useState(false);
+  const [assignStoresError, setAssignStoresError] = useState<string | null>(null);
+  const [assignAllStores, setAssignAllStores] = useState<Store[]>([]);
+  const [assignInitialStoreIDs, setAssignInitialStoreIDs] = useState<string[]>([]);
+  const [assignSelectedStoreIDs, setAssignSelectedStoreIDs] = useState<string[]>([]);
+  const [assignBusy, setAssignBusy] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
   const [createMenuError, setCreateMenuError] = useState<string | null>(null);
   const [createMenuSuccess, setCreateMenuSuccess] = useState<string | null>(null);
   const [menuDetailsID, setMenuDetailsID] = useState<string | null>(null);
@@ -176,6 +192,10 @@ export function MenusPage() {
   const addableItemsForMenu = useMemo(
     () => items.filter((item) => item.is_active && !assignedMenuItemIDSet.has(item.id)),
     [assignedMenuItemIDSet, items],
+  );
+  const assignSelectedStoreSet = useMemo(
+    () => new Set(assignSelectedStoreIDs),
+    [assignSelectedStoreIDs],
   );
 
   useEffect(() => {
@@ -515,6 +535,110 @@ export function MenusPage() {
     setDeleteMenuTarget(null);
   };
 
+  const handleOpenAssignMenu = async (menu: MenuSummary) => {
+    setAssignMenuTarget({ id: menu.id, name: menu.name });
+    setAssignStoresLoading(true);
+    setAssignStoresError(null);
+    setAssignError(null);
+    setAssignAllStores([]);
+    setAssignInitialStoreIDs([]);
+    setAssignSelectedStoreIDs([]);
+    setCreateMenuError(null);
+    setCreateMenuSuccess(null);
+
+    try {
+      const [allStores, assignedStores] = await Promise.all([
+        listStores(),
+        listMenuStores(menu.id),
+      ]);
+      const sortedStores = [...allStores].sort((a, b) => a.name.localeCompare(b.name));
+      const availableStoreIDs = new Set(sortedStores.map((store) => store.id));
+      const assignedStoreIDs = assignedStores
+        .map((store) => store.store_id)
+        .filter((storeID) => availableStoreIDs.has(storeID));
+
+      setAssignAllStores(sortedStores);
+      setAssignInitialStoreIDs(assignedStoreIDs);
+      setAssignSelectedStoreIDs(assignedStoreIDs);
+    } catch (assignLoadError) {
+      setAssignStoresError(
+        getErrorMessage(assignLoadError, 'Unable to load store assignments for this menu.'),
+      );
+    } finally {
+      setAssignStoresLoading(false);
+    }
+  };
+
+  const toggleAssignStoreSelected = (storeID: string, checked: boolean) => {
+    setAssignSelectedStoreIDs((previous) => {
+      const next = new Set(previous);
+      if (checked) {
+        next.add(storeID);
+      } else {
+        next.delete(storeID);
+      }
+      return Array.from(next);
+    });
+  };
+
+  const handleCancelAssignMenu = () => {
+    if (assignBusy) {
+      return;
+    }
+    setAssignMenuTarget(null);
+    setAssignStoresLoading(false);
+    setAssignStoresError(null);
+    setAssignError(null);
+    setAssignAllStores([]);
+    setAssignInitialStoreIDs([]);
+    setAssignSelectedStoreIDs([]);
+  };
+
+  const handleConfirmAssignMenu = async () => {
+    if (!assignMenuTarget) {
+      return;
+    }
+    if (assignStoresLoading) {
+      setAssignError('Store list is still loading.');
+      return;
+    }
+    if (assignStoresError) {
+      setAssignError('Unable to save until store assignments are loaded.');
+      return;
+    }
+    const target = assignMenuTarget;
+    const selectedSet = new Set(assignSelectedStoreIDs);
+    const initialSet = new Set(assignInitialStoreIDs);
+    const toAssign = assignSelectedStoreIDs.filter((storeID) => !initialSet.has(storeID));
+    const toRemove = assignInitialStoreIDs.filter((storeID) => !selectedSet.has(storeID));
+
+    if (toAssign.length === 0 && toRemove.length === 0) {
+      setAssignMenuTarget(null);
+      return;
+    }
+
+    setAssignBusy(true);
+    setAssignError(null);
+
+    try {
+      if (toAssign.length > 0) {
+        await assignMenuStoresBulk(target.id, toAssign);
+      }
+      if (toRemove.length > 0) {
+        await Promise.all(toRemove.map((storeID) => removeStoreMenu(storeID, target.id)));
+      }
+      setCreateMenuSuccess(`Updated store assignments for "${target.name}".`);
+      setAssignMenuTarget(null);
+      setAssignAllStores([]);
+      setAssignInitialStoreIDs([]);
+      setAssignSelectedStoreIDs([]);
+    } catch (assignErrorValue) {
+      setAssignError(getErrorMessage(assignErrorValue, 'Unable to update store assignments.'));
+    } finally {
+      setAssignBusy(false);
+    }
+  };
+
   const handleConfirmDeleteMenu = async () => {
     if (!deleteMenuTarget) {
       return;
@@ -731,6 +855,19 @@ export function MenusPage() {
                             <td>{formatDate(menu.updated_at)}</td>
                             <td>
                               <div className={styles.inlineActions}>
+                                <span title="Assign this menu to stores">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onPress={() => void handleOpenAssignMenu(menu)}
+                                    isDisabled={
+                                      cloningMenuID === menu.id || deleteMenuBusy || assignBusy
+                                    }
+                                  >
+                                    Assign
+                                  </Button>
+                                </span>
                                 <Button
                                   type="button"
                                   size="sm"
@@ -1215,6 +1352,79 @@ export function MenusPage() {
           ) : null}
         </>
       ) : null}
+
+      <ConfirmDialog
+        isOpen={assignMenuTarget !== null}
+        title={assignMenuTarget ? `Assign "${assignMenuTarget.name}" to stores` : 'Assign menu'}
+        description="Selected stores will have this menu assigned."
+        details={
+          <div className={styles.assignDialog}>
+            {assignStoresLoading ? <p className={styles.muted}>Loading stores...</p> : null}
+            {!assignStoresLoading && assignStoresError ? (
+              <p className={styles.error} role="alert">
+                {assignStoresError}
+              </p>
+            ) : null}
+            {!assignStoresLoading && !assignStoresError ? (
+              <>
+                {assignAllStores.length === 0 ? (
+                  <p className={styles.muted}>No stores available yet.</p>
+                ) : (
+                  <>
+                    <p className={styles.assignSummary}>
+                      Selected {assignSelectedStoreIDs.length} of {assignAllStores.length} stores
+                    </p>
+                    <div className={styles.inlineActions}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onPress={() =>
+                          setAssignSelectedStoreIDs(assignAllStores.map((store) => store.id))
+                        }
+                        isDisabled={assignBusy || assignAllStores.length === 0}
+                      >
+                        Select all
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onPress={() => setAssignSelectedStoreIDs([])}
+                        isDisabled={assignBusy || assignSelectedStoreIDs.length === 0}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                    <ul className={styles.assignStoreList}>
+                      {assignAllStores.map((store) => (
+                        <li key={store.id} className={styles.assignStoreRow}>
+                          <label className={styles.assignStoreLabel}>
+                            <input
+                              type="checkbox"
+                              checked={assignSelectedStoreSet.has(store.id)}
+                              onChange={(event) =>
+                                toggleAssignStoreSelected(store.id, event.target.checked)
+                              }
+                              disabled={assignBusy}
+                            />
+                            <span>{store.name}</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </>
+            ) : null}
+          </div>
+        }
+        confirmLabel="Save assignments"
+        onConfirm={() => void handleConfirmAssignMenu()}
+        onCancel={handleCancelAssignMenu}
+        loading={assignBusy}
+        error={assignError}
+      />
 
       <ConfirmDialog
         isOpen={deleteMenuTarget !== null}

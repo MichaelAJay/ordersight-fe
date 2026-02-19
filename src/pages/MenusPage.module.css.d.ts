@@ -28,6 +28,11 @@ declare const styles: {
   readonly muted: string;
   readonly actions: string;
   readonly inlineActions: string;
+  readonly assignDialog: string;
+  readonly assignSummary: string;
+  readonly assignStoreList: string;
+  readonly assignStoreRow: string;
+  readonly assignStoreLabel: string;
   readonly detailPanel: string;
   readonly detailTitle: string;
   readonly detailList: string;

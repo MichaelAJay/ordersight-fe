@@ -7,7 +7,7 @@ import { getStore, type Store } from '../../services/stores';
 import { Button } from '@/components/common/Button/Button';
 import styles from './StoreShell.module.css';
 
-type TabKey = 'orders' | 'team' | 'activity' | 'settings';
+type TabKey = 'orders' | 'menus' | 'team' | 'activity' | 'settings';
 
 type TabConfig = {
   key: TabKey;
@@ -17,6 +17,7 @@ type TabConfig = {
 
 const TAB_CONFIG: TabConfig[] = [
   { key: 'orders', label: 'Orders' },
+  { key: 'menus', label: 'Menus' },
   { key: 'team', label: 'Team' },
   { key: 'activity', label: 'Activity' },
   { key: 'settings', label: 'Settings', adminOnly: true },
@@ -89,6 +90,7 @@ export function StoreShell() {
 
     if (
       segment === 'orders' ||
+      segment === 'menus' ||
       segment === 'team' ||
       segment === 'activity' ||
       segment === 'settings'
