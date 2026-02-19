@@ -10,12 +10,12 @@ export function MenuQuickEntryPage() {
       <section className={styles.panel}>
         <h1 className={styles.title}>Quick-add items</h1>
         <p className={styles.lead}>
-          This route is ready for the table-style quick-entry flow. You can return to your menu
-          whenever you want.
+          This route is ready for the table-style quick-entry flow. You can return to menus whenever
+          you want.
         </p>
         <div className={styles.actions}>
           <Button type="button" onPress={() => navigate('/menus')}>
-            Back to your menu
+            Back to menus
           </Button>
         </div>
       </section>

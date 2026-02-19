@@ -112,4 +112,56 @@ describe('menuItems service', () => {
     expect(getJSONMock).toHaveBeenCalledWith('/categories');
     expect(result).toEqual([{ id: 'cat-1', name: 'Sandwiches', sort_order: 0 }]);
   });
+
+  test('gets menu item details from direct payload', async () => {
+    getJSONMock.mockResolvedValue({
+      id: 'item-1',
+      name: 'Turkey Club',
+      category_id: 'cat-1',
+      description: 'Served with chips',
+      base_price: 1399,
+      price_unit: 'flat',
+      is_active: true,
+      rules: [{ rule_type: 'service_style', value: 'hot' }],
+      soft_rules: [],
+      variant_groups: [],
+      modifier_groups: [],
+    });
+
+    const { getMenuItemById } = await import('../menuItems');
+    const result = await getMenuItemById('item-1');
+
+    expect(getJSONMock).toHaveBeenCalledWith('/menu-items/item-1');
+    expect(result?.id).toBe('item-1');
+    expect(result?.rules).toHaveLength(1);
+    expect(result?.rules[0]).toEqual({ rule_type: 'service_style', value: 'hot' });
+  });
+
+  test('gets menu item details from wrapped payload', async () => {
+    getJSONMock.mockResolvedValue({
+      data: {
+        id: 'item-2',
+        name: 'Large Salad',
+        category_id: null,
+        description: '',
+        base_price: 1099,
+        price_unit: 'flat',
+        is_active: true,
+        rules: [],
+        soft_rules: [
+          { id: 'soft-1', label: 'Kitchen', content: 'No croutons', is_customer_visible: false },
+        ],
+        variant_groups: [],
+        modifier_groups: [],
+      },
+    });
+
+    const { getMenuItemById } = await import('../menuItems');
+    const result = await getMenuItemById('item-2');
+
+    expect(getJSONMock).toHaveBeenCalledWith('/menu-items/item-2');
+    expect(result?.id).toBe('item-2');
+    expect(result?.soft_rules).toHaveLength(1);
+    expect(result?.soft_rules[0].label).toBe('Kitchen');
+  });
 });

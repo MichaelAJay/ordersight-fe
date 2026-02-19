@@ -168,6 +168,15 @@ export interface MenuImportCommitSummary {
   hard_rules_created?: number;
   soft_rules_created?: number;
   rows_skipped?: number;
+  created_menu_id?: string;
+  assigned_item_count?: number;
+}
+
+export interface MenuImportCommitRequest {
+  create_menu?: {
+    name: string;
+    description?: string | null;
+  };
 }
 
 export interface MenuImportSavedMappingsResponse {
@@ -420,6 +429,15 @@ function normalizeCommitSummary(payload: unknown): MenuImportCommitSummary {
       typeof record['rows_skipped'] === 'number' && Number.isInteger(record['rows_skipped'])
         ? Math.max(0, record['rows_skipped'])
         : undefined,
+    created_menu_id:
+      typeof record['created_menu_id'] === 'string' && record['created_menu_id'].trim().length > 0
+        ? record['created_menu_id'].trim()
+        : undefined,
+    assigned_item_count:
+      typeof record['assigned_item_count'] === 'number' &&
+      Number.isInteger(record['assigned_item_count'])
+        ? Math.max(0, record['assigned_item_count'])
+        : undefined,
   };
 }
 
@@ -441,8 +459,14 @@ export async function mapMenuImportCSV(
   return normalizeMappingValidationResult(response);
 }
 
-export async function commitMenuImportCSV(sessionID: string): Promise<MenuImportCommitSummary> {
-  const response = await postJSON<undefined, unknown>(`/imports/csv/${sessionID}/commit`);
+export async function commitMenuImportCSV(
+  sessionID: string,
+  payload?: MenuImportCommitRequest,
+): Promise<MenuImportCommitSummary> {
+  const response = await postJSON<MenuImportCommitRequest | undefined, unknown>(
+    `/imports/csv/${sessionID}/commit`,
+    payload,
+  );
   return normalizeCommitSummary(response);
 }
 

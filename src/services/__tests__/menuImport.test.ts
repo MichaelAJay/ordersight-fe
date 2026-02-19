@@ -97,13 +97,41 @@ describe('menuImport service', () => {
     const { commitMenuImportCSV } = await import('../menuImport');
     const result = await commitMenuImportCSV('session-1');
 
-    expect(postJSONMock).toHaveBeenCalledWith('/imports/csv/session-1/commit');
-    expect(result).toEqual({
+    expect(postJSONMock).toHaveBeenCalledWith('/imports/csv/session-1/commit', undefined);
+    expect(result).toMatchObject({
       created_count: 4,
       updated_count: 2,
       error_count: 0,
       errors: [],
     });
+  });
+
+  test('commits CSV import and creates a menu when create_menu is set', async () => {
+    postJSONMock.mockResolvedValue({
+      created_count: 2,
+      updated_count: 0,
+      error_count: 0,
+      errors: [],
+      created_menu_id: 'menu-77',
+      assigned_item_count: 2,
+    });
+
+    const { commitMenuImportCSV } = await import('../menuImport');
+    const result = await commitMenuImportCSV('session-2', {
+      create_menu: {
+        name: 'Lunch Menu',
+        description: 'Imported in one pass',
+      },
+    });
+
+    expect(postJSONMock).toHaveBeenCalledWith('/imports/csv/session-2/commit', {
+      create_menu: {
+        name: 'Lunch Menu',
+        description: 'Imported in one pass',
+      },
+    });
+    expect(result.created_menu_id).toBe('menu-77');
+    expect(result.assigned_item_count).toBe(2);
   });
 
   test('lists saved mappings with /imports/mappings', async () => {

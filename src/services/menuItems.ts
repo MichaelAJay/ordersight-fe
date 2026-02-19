@@ -12,6 +12,55 @@ export interface MenuItem {
   is_active: boolean;
 }
 
+export interface MenuItemRule {
+  rule_type: string;
+  value: string;
+}
+
+export interface MenuItemSoftRule {
+  id: string;
+  label: string;
+  content: string;
+  is_customer_visible: boolean;
+  sort_order: number;
+}
+
+export interface VariantOption {
+  id: string;
+  name: string;
+  price: number | null;
+  price_unit: PriceUnit | null;
+  sort_order: number;
+}
+
+export interface VariantGroup {
+  id: string;
+  name: string;
+  pricing_mode: string;
+  sort_order: number;
+  options: VariantOption[];
+}
+
+export interface AttachedModifierGroup {
+  id: string;
+  name: string;
+  min_selections: number;
+  max_selections: number;
+  sort_order: number;
+  options: VariantOption[];
+}
+
+export interface MenuItemDetail extends MenuItem {
+  sku: string | null;
+  serving_description: string | null;
+  dietary_tags: string | null;
+  allergens: string | null;
+  rules: MenuItemRule[];
+  soft_rules: MenuItemSoftRule[];
+  variant_groups: VariantGroup[];
+  modifier_groups: AttachedModifierGroup[];
+}
+
 export interface ListMenuItemsResult {
   items: MenuItem[];
   total: number;
@@ -83,6 +132,167 @@ function normalizeMenuItem(value: unknown): MenuItem | null {
     price_unit: normalizeOptionalString(record['price_unit']),
     is_active: record['is_active'] !== false,
   };
+}
+
+function normalizeMenuItemRule(value: unknown): MenuItemRule | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const ruleType = normalizeString(record['rule_type']);
+  const ruleValue = normalizeString(record['value']);
+  if (!ruleType || !ruleValue) {
+    return null;
+  }
+  return {
+    rule_type: ruleType,
+    value: ruleValue,
+  };
+}
+
+function normalizeMenuItemSoftRule(value: unknown): MenuItemSoftRule | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeString(record['id']);
+  if (!id) {
+    return null;
+  }
+  return {
+    id,
+    label: normalizeString(record['label']),
+    content: normalizeString(record['content']),
+    is_customer_visible: record['is_customer_visible'] === true,
+    sort_order: normalizeNonNegativeInt(record['sort_order'], 0),
+  };
+}
+
+function normalizeVariantOption(value: unknown): VariantOption | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeString(record['id']);
+  const name = normalizeString(record['name']);
+  if (!id || !name) {
+    return null;
+  }
+  const price =
+    typeof record['price'] === 'number' && Number.isInteger(record['price'])
+      ? record['price']
+      : null;
+  return {
+    id,
+    name,
+    price,
+    price_unit: normalizeOptionalString(record['price_unit']),
+    sort_order: normalizeNonNegativeInt(record['sort_order'], 0),
+  };
+}
+
+function normalizeVariantGroup(value: unknown): VariantGroup | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeString(record['id']);
+  const name = normalizeString(record['name']);
+  if (!id || !name) {
+    return null;
+  }
+  const optionsRaw = Array.isArray(record['options']) ? record['options'] : [];
+  const options = optionsRaw
+    .map((option) => normalizeVariantOption(option))
+    .filter((option): option is VariantOption => option !== null);
+  return {
+    id,
+    name,
+    pricing_mode: normalizeString(record['pricing_mode']),
+    sort_order: normalizeNonNegativeInt(record['sort_order'], 0),
+    options,
+  };
+}
+
+function normalizeAttachedModifierGroup(value: unknown): AttachedModifierGroup | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeString(record['id']);
+  const name = normalizeString(record['name']);
+  if (!id || !name) {
+    return null;
+  }
+  const optionsRaw = Array.isArray(record['options']) ? record['options'] : [];
+  const options = optionsRaw
+    .map((option) => normalizeVariantOption(option))
+    .filter((option): option is VariantOption => option !== null);
+  return {
+    id,
+    name,
+    min_selections: normalizeNonNegativeInt(record['min_selections'], 0),
+    max_selections: normalizeNonNegativeInt(record['max_selections'], 0),
+    sort_order: normalizeNonNegativeInt(record['sort_order'], 0),
+    options,
+  };
+}
+
+function normalizeMenuItemDetail(value: unknown): MenuItemDetail | null {
+  const base = normalizeMenuItem(value);
+  if (!base || !value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const rulesRaw = Array.isArray(record['rules']) ? record['rules'] : [];
+  const rules = rulesRaw
+    .map((entry) => normalizeMenuItemRule(entry))
+    .filter((entry): entry is MenuItemRule => entry !== null);
+  const softRulesRaw = Array.isArray(record['soft_rules']) ? record['soft_rules'] : [];
+  const softRules = softRulesRaw
+    .map((entry) => normalizeMenuItemSoftRule(entry))
+    .filter((entry): entry is MenuItemSoftRule => entry !== null);
+  const variantGroupsRaw = Array.isArray(record['variant_groups']) ? record['variant_groups'] : [];
+  const variantGroups = variantGroupsRaw
+    .map((entry) => normalizeVariantGroup(entry))
+    .filter((entry): entry is VariantGroup => entry !== null);
+  const modifierGroupsRaw = Array.isArray(record['modifier_groups'])
+    ? record['modifier_groups']
+    : [];
+  const modifierGroups = modifierGroupsRaw
+    .map((entry) => normalizeAttachedModifierGroup(entry))
+    .filter((entry): entry is AttachedModifierGroup => entry !== null);
+
+  return {
+    ...base,
+    sku: normalizeOptionalString(record['sku']),
+    serving_description: normalizeOptionalString(record['serving_description']),
+    dietary_tags: normalizeOptionalString(record['dietary_tags']),
+    allergens: normalizeOptionalString(record['allergens']),
+    rules,
+    soft_rules: softRules,
+    variant_groups: variantGroups,
+    modifier_groups: modifierGroups,
+  };
+}
+
+function normalizeMenuItemDetailPayload(payload: unknown): MenuItemDetail | null {
+  const direct = normalizeMenuItemDetail(payload);
+  if (direct) {
+    return direct;
+  }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+  const record = payload as Record<string, unknown>;
+  const keys = ['item', 'menu_item', 'data'];
+  for (const key of keys) {
+    const normalized = normalizeMenuItemDetail(record[key]);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return null;
 }
 
 function normalizeMenuItemList(payload: unknown, fallbackLimit: number): ListMenuItemsResult {
@@ -183,4 +393,9 @@ export async function listMenuItems(input?: ListMenuItemsInput): Promise<ListMen
 export async function listCategories(): Promise<Category[]> {
   const payload = await getJSON<unknown>('/categories');
   return normalizeCategories(payload);
+}
+
+export async function getMenuItemById(menuItemID: string): Promise<MenuItemDetail | null> {
+  const payload = await getJSON<unknown>(`/menu-items/${menuItemID}`);
+  return normalizeMenuItemDetailPayload(payload);
 }

@@ -755,6 +755,9 @@ export function MenuImportWizardPage() {
   const [committing, setCommitting] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [commitSummary, setCommitSummary] = useState<MenuImportCommitSummary | null>(null);
+  const [createMenuAfterImport, setCreateMenuAfterImport] = useState(false);
+  const [createMenuName, setCreateMenuName] = useState('');
+  const [createMenuDescription, setCreateMenuDescription] = useState('');
   const [rowKeepSelections, setRowKeepSelections] = useState<Record<number, boolean>>({});
   const [rowEdits, setRowEdits] = useState<Record<number, Record<string, string>>>({});
   const [previewDirty, setPreviewDirty] = useState(false);
@@ -1076,6 +1079,7 @@ export function MenuImportWizardPage() {
     [duplicateConflicts, rowKeepSelections],
   );
   const hasUnresolvedDuplicateConflicts = unresolvedDuplicateConflicts.length > 0;
+  const createMenuNameMissing = createMenuAfterImport && createMenuName.trim().length === 0;
   const canCommit =
     mappingResult !== null &&
     !validating &&
@@ -1083,6 +1087,7 @@ export function MenuImportWizardPage() {
     !previewDirty &&
     !hasBlockingValidationErrors &&
     !hasUnresolvedDuplicateConflicts &&
+    !createMenuNameMissing &&
     uploadRowsWithSource.length > 0 &&
     validPreviewRowsCount > 0;
   const rowErrorFixEntries = useMemo(() => {
@@ -1863,6 +1868,9 @@ export function MenuImportWizardPage() {
     setCommitting(false);
     setCommitError(null);
     setCommitSummary(null);
+    setCreateMenuAfterImport(false);
+    setCreateMenuName('');
+    setCreateMenuDescription('');
     setSaveMappingName('');
     setSaveMappingStatus(null);
     setSavedMappingsError(null);
@@ -1998,6 +2006,10 @@ export function MenuImportWizardPage() {
       setCommitError('Resolve duplicate groups by checking only one row per duplicate set.');
       return;
     }
+    if (createMenuNameMissing) {
+      setCommitError('Enter a menu name or disable post-import menu creation.');
+      return;
+    }
     if (!canCommit) {
       setCommitError('Resolve preview issues before importing.');
       return;
@@ -2013,7 +2025,16 @@ export function MenuImportWizardPage() {
         return;
       }
 
-      const summary = await commitMenuImportCSV(uploadResult.import_session_id);
+      const commitPayload = createMenuAfterImport
+        ? {
+            create_menu: {
+              name: createMenuName.trim(),
+              description: createMenuDescription.trim() || null,
+            },
+          }
+        : undefined;
+
+      const summary = await commitMenuImportCSV(uploadResult.import_session_id, commitPayload);
       setCommitSummary(summary);
       setStep(4);
       setMaxStepReached((current) => (current > 4 ? current : 4));
@@ -2161,14 +2182,14 @@ export function MenuImportWizardPage() {
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <div>
-          <h1 className={styles.title}>Import from a spreadsheet</h1>
+          <h1 className={styles.title}>Import menu items from a spreadsheet</h1>
           <p className={styles.subtitle}>
-            Upload locally, map your columns, group modifier data, and confirm the exact import
-            output.
+            Upload locally, map your columns, group modifier data, and confirm the exact menu item
+            import output.
           </p>
         </div>
         <Button type="button" size="sm" variant="outline" onPress={() => navigate('/menus')}>
-          Back to your menu
+          Back to menus
         </Button>
       </header>
 
@@ -3056,6 +3077,51 @@ export function MenuImportWizardPage() {
           ) : null}
           {validationError ? <p className={styles.warning}>{validationError}</p> : null}
 
+          <div className={styles.fieldRow}>
+            <h3 className={styles.sectionTitle}>After import</h3>
+            <label className={styles.inputLabel}>
+              <span>
+                <input
+                  type="checkbox"
+                  checked={createMenuAfterImport}
+                  onChange={(event) => setCreateMenuAfterImport(event.target.checked)}
+                />{' '}
+                Create a menu with all imported items now
+              </span>
+            </label>
+            {createMenuAfterImport ? (
+              <>
+                <label className={styles.inputLabel}>
+                  New menu name
+                  <input
+                    type="text"
+                    className={styles.inputControl}
+                    value={createMenuName}
+                    onChange={(event) => setCreateMenuName(event.target.value)}
+                    placeholder="Weekday Lunch Menu"
+                  />
+                </label>
+                <label className={styles.inputLabel}>
+                  Menu description (optional)
+                  <input
+                    type="text"
+                    className={styles.inputControl}
+                    value={createMenuDescription}
+                    onChange={(event) => setCreateMenuDescription(event.target.value)}
+                    placeholder="Internal notes for this menu"
+                  />
+                </label>
+                {createMenuNameMissing ? (
+                  <p className={styles.warning}>Enter a menu name to create a menu after import.</p>
+                ) : null}
+              </>
+            ) : (
+              <p className={styles.muted}>
+                Skip this if you only want to import items now and create menus later.
+              </p>
+            )}
+          </div>
+
           <div className={styles.actions}>
             <Button type="button" variant="outline" onPress={() => setStep(2)}>
               Back
@@ -3095,6 +3161,12 @@ export function MenuImportWizardPage() {
                 {commitSummary.soft_rules_created ?? 0} • Rows skipped:{' '}
                 {commitSummary.rows_skipped ?? 0}
               </p>
+              {commitSummary.created_menu_id ? (
+                <p className={styles.success}>
+                  Menu created from imported items. Assigned items:{' '}
+                  {commitSummary.assigned_item_count ?? 0}
+                </p>
+              ) : null}
               {commitSummary.errors.length > 0 ? (
                 <ul className={styles.issueList}>
                   {commitSummary.errors.map((error, index) => (
@@ -3136,7 +3208,7 @@ export function MenuImportWizardPage() {
 
           <div className={styles.actions}>
             <Button type="button" onPress={() => navigate('/menus')}>
-              View your items
+              View menus
             </Button>
             <Button type="button" variant="outline" onPress={resetWizard}>
               Import another file

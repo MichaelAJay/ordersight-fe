@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const getJSONMock = vi.fn();
+const postJSONMock = vi.fn();
+const delJSONMock = vi.fn();
 
 vi.mock('../http', () => ({
   getJSON: (...args: unknown[]) => getJSONMock(...args),
+  postJSON: (...args: unknown[]) => postJSONMock(...args),
+  delJSON: (...args: unknown[]) => delJSONMock(...args),
 }));
 
 describe('menus service', () => {
@@ -81,5 +85,58 @@ describe('menus service', () => {
       created_at: undefined,
       updated_at: undefined,
     });
+  });
+
+  test('creates a menu via /menus', async () => {
+    postJSONMock.mockResolvedValue({
+      id: 'menu-9',
+      name: 'Dinner',
+      description: 'After-hours',
+      is_active: true,
+    });
+
+    const { createMenu } = await import('../menus');
+    const result = await createMenu({ name: 'Dinner', description: 'After-hours' });
+
+    expect(postJSONMock).toHaveBeenCalledWith('/menus', {
+      name: 'Dinner',
+      description: 'After-hours',
+    });
+    expect(result?.id).toBe('menu-9');
+    expect(result?.name).toBe('Dinner');
+  });
+
+  test('assigns menu items via /menus/:id/items', async () => {
+    postJSONMock.mockResolvedValue({
+      results: [
+        {
+          menu_id: 'menu-7',
+          menu_item_id: 'item-1',
+          is_active: true,
+          sort_order: 0,
+        },
+      ],
+    });
+
+    const { assignMenuItems } = await import('../menus');
+    const result = await assignMenuItems('menu-7', ['item-1']);
+
+    expect(postJSONMock).toHaveBeenCalledWith('/menus/menu-7/items', [{ menu_item_id: 'item-1' }]);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.menu_item_id).toBe('item-1');
+  });
+
+  test('removes menu-item assignment via /menus/:id/items/:item_id', async () => {
+    delJSONMock.mockResolvedValue({});
+    const { removeMenuItemAssignment } = await import('../menus');
+    await removeMenuItemAssignment('menu-7', 'item-3');
+    expect(delJSONMock).toHaveBeenCalledWith('/menus/menu-7/items/item-3');
+  });
+
+  test('deletes menu via /menus/:id', async () => {
+    delJSONMock.mockResolvedValue({});
+    const { deleteMenu } = await import('../menus');
+    await deleteMenu('menu-11');
+    expect(delJSONMock).toHaveBeenCalledWith('/menus/menu-11');
   });
 });
