@@ -50,6 +50,13 @@ export interface AttachedModifierGroup {
   options: VariantOption[];
 }
 
+export interface ExternalProviderMapping {
+  provider_key: string;
+  provider_name: string;
+  external_item_key: string;
+  is_active: boolean;
+}
+
 export interface MenuItemDetail extends MenuItem {
   sku: string | null;
   serving_description: string | null;
@@ -59,6 +66,7 @@ export interface MenuItemDetail extends MenuItem {
   soft_rules: MenuItemSoftRule[];
   variant_groups: VariantGroup[];
   modifier_groups: AttachedModifierGroup[];
+  external_provider_mappings: ExternalProviderMapping[];
 }
 
 export interface ListMenuItemsResult {
@@ -238,6 +246,25 @@ function normalizeAttachedModifierGroup(value: unknown): AttachedModifierGroup |
   };
 }
 
+function normalizeExternalProviderMapping(value: unknown): ExternalProviderMapping | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const providerKey = normalizeString(record['provider_key']);
+  const providerName = normalizeString(record['provider_name']);
+  const externalItemKey = normalizeString(record['external_item_key']);
+  if (!providerKey || !providerName || !externalItemKey) {
+    return null;
+  }
+  return {
+    provider_key: providerKey,
+    provider_name: providerName,
+    external_item_key: externalItemKey,
+    is_active: record['is_active'] === true,
+  };
+}
+
 function normalizeMenuItemDetail(value: unknown): MenuItemDetail | null {
   const base = normalizeMenuItem(value);
   if (!base || !value || typeof value !== 'object') {
@@ -262,6 +289,12 @@ function normalizeMenuItemDetail(value: unknown): MenuItemDetail | null {
   const modifierGroups = modifierGroupsRaw
     .map((entry) => normalizeAttachedModifierGroup(entry))
     .filter((entry): entry is AttachedModifierGroup => entry !== null);
+  const externalProviderMappingsRaw = Array.isArray(record['external_provider_mappings'])
+    ? record['external_provider_mappings']
+    : [];
+  const externalProviderMappings = externalProviderMappingsRaw
+    .map((entry) => normalizeExternalProviderMapping(entry))
+    .filter((entry): entry is ExternalProviderMapping => entry !== null);
 
   return {
     ...base,
@@ -273,6 +306,7 @@ function normalizeMenuItemDetail(value: unknown): MenuItemDetail | null {
     soft_rules: softRules,
     variant_groups: variantGroups,
     modifier_groups: modifierGroups,
+    external_provider_mappings: externalProviderMappings,
   };
 }
 

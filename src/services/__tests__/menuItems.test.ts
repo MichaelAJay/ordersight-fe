@@ -126,6 +126,14 @@ describe('menuItems service', () => {
       soft_rules: [],
       variant_groups: [],
       modifier_groups: [],
+      external_provider_mappings: [
+        {
+          provider_key: 'ezcater',
+          provider_name: 'EZCater',
+          external_item_key: '12345',
+          is_active: true,
+        },
+      ],
     });
 
     const { getMenuItemById } = await import('../menuItems');
@@ -135,6 +143,14 @@ describe('menuItems service', () => {
     expect(result?.id).toBe('item-1');
     expect(result?.rules).toHaveLength(1);
     expect(result?.rules[0]).toEqual({ rule_type: 'service_style', value: 'hot' });
+    expect(result?.external_provider_mappings).toEqual([
+      {
+        provider_key: 'ezcater',
+        provider_name: 'EZCater',
+        external_item_key: '12345',
+        is_active: true,
+      },
+    ]);
   });
 
   test('gets menu item details from wrapped payload', async () => {
@@ -163,5 +179,6 @@ describe('menuItems service', () => {
     expect(result?.id).toBe('item-2');
     expect(result?.soft_rules).toHaveLength(1);
     expect(result?.soft_rules[0].label).toBe('Kitchen');
+    expect(result?.external_provider_mappings).toEqual([]);
   });
 });

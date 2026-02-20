@@ -1115,6 +1115,27 @@ export function MenusPage() {
 
                       <div className={styles.fieldRow}>
                         <h4 className={styles.sectionTitle}>
+                          External Providers ({itemDetails.external_provider_mappings.length})
+                        </h4>
+                        {itemDetails.external_provider_mappings.length === 0 ? (
+                          <p className={styles.muted}>No external provider mappings.</p>
+                        ) : (
+                          <ul className={styles.detailList}>
+                            {itemDetails.external_provider_mappings.map((mapping) => (
+                              <li
+                                key={`${itemDetails.id}-external-provider-${mapping.provider_key}`}
+                              >
+                                <strong>{mapping.provider_name}</strong> ({mapping.provider_key}):
+                                {` ${mapping.external_item_key} `}
+                                {mapping.is_active ? '(Active)' : '(Inactive)'}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      <div className={styles.fieldRow}>
+                        <h4 className={styles.sectionTitle}>
                           Hard Rules ({itemDetails.rules.length})
                         </h4>
                         {itemDetails.rules.length === 0 ? (
