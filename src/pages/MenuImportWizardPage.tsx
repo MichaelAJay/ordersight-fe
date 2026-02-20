@@ -8,13 +8,16 @@ import {
   createMenuImportMapping,
   deleteMenuImportMapping,
   listMenuImportMappings,
+  listMenuImportProviders,
   mapMenuImportCSV,
   renameMenuImportMapping,
   uploadMenuImportCSV,
   type MenuImportCommitSummary,
+  type MenuImportExternalProviderMapping,
   type MenuImportMappingRequest,
   type MenuImportMappingValidationResult,
   type MenuImportModifierGroupBundleMapping,
+  type MenuImportProviderCatalogEntry,
   type MenuImportPriceUnit,
   type MenuImportRuleType,
   type MenuImportSavedMappingPayload,
@@ -36,7 +39,7 @@ type MappingKey =
   | 'sort_order';
 
 type WizardStep = 0 | 1 | 2 | 3 | 4;
-type RemainingMode = 'unassigned' | 'hard_rule' | 'soft_rule' | 'skip';
+type RemainingMode = 'unassigned' | 'hard_rule' | 'soft_rule' | 'external_provider' | 'skip';
 type BundleSlotKey =
   | 'name_column'
   | 'choices_column'
@@ -66,6 +69,8 @@ type RemainingDecision = {
   ruleType: MenuImportRuleType | '';
   label: string;
   softLabelConfirmed: boolean;
+  providerKey: string;
+  makeActive: boolean | null;
 };
 
 type SavedImportMapping = {
@@ -553,6 +558,17 @@ function formatDateTime(value: string): string {
   return date.toLocaleString();
 }
 
+function createDefaultRemainingDecision(column: string): RemainingDecision {
+  return {
+    mode: 'unassigned',
+    ruleType: '',
+    label: column,
+    softLabelConfirmed: false,
+    providerKey: '',
+    makeActive: null,
+  };
+}
+
 function fromSavedMappingRecord(record: MenuImportSavedMappingRecord): SavedImportMapping {
   const mapping = record.mapping as MenuImportSavedMappingPayload;
   const modifierBundlesRaw = Array.isArray(mapping.modifier_group_bundles)
@@ -603,7 +619,13 @@ function fromSavedMappingRecord(record: MenuImportSavedMappingRecord): SavedImpo
     }
     const decision = raw as Record<string, unknown>;
     const mode = decision['mode'];
-    if (mode !== 'unassigned' && mode !== 'hard_rule' && mode !== 'soft_rule' && mode !== 'skip') {
+    if (
+      mode !== 'unassigned' &&
+      mode !== 'hard_rule' &&
+      mode !== 'soft_rule' &&
+      mode !== 'external_provider' &&
+      mode !== 'skip'
+    ) {
       continue;
     }
     const ruleTypeRaw = decision['ruleType'];
@@ -614,6 +636,13 @@ function fromSavedMappingRecord(record: MenuImportSavedMappingRecord): SavedImpo
       ruleTypeRaw === 'order_multiple'
         ? ruleTypeRaw
         : '';
+    const providerKeyRaw =
+      typeof decision['providerKey'] === 'string'
+        ? decision['providerKey']
+        : typeof decision['provider_key'] === 'string'
+          ? decision['provider_key']
+          : '';
+    const makeActiveRaw = decision['makeActive'] ?? decision['make_active'];
     decisions[column] = {
       mode,
       ruleType,
@@ -624,6 +653,8 @@ function fromSavedMappingRecord(record: MenuImportSavedMappingRecord): SavedImpo
             ? decision['softLabelConfirmed']
             : true
           : true,
+      providerKey: providerKeyRaw.trim(),
+      makeActive: typeof makeActiveRaw === 'boolean' ? makeActiveRaw : null,
     };
   }
 
@@ -647,12 +678,34 @@ function toSavedMappingPayload(
   modifierBundles: ModifierBundleDraft[],
   remainingDecisions: Record<string, RemainingDecision>,
 ): MenuImportSavedMappingPayload {
+  const savedRemainingDecisions: Record<string, unknown> = {};
+  for (const [column, decision] of Object.entries(remainingDecisions)) {
+    if (decision.mode === 'external_provider') {
+      savedRemainingDecisions[column] = {
+        mode: decision.mode,
+        ruleType: '',
+        label: decision.label,
+        softLabelConfirmed: true,
+        provider_key: decision.providerKey,
+        make_active: decision.makeActive,
+      };
+      continue;
+    }
+
+    savedRemainingDecisions[column] = {
+      mode: decision.mode,
+      ruleType: decision.ruleType,
+      label: decision.label,
+      softLabelConfirmed: decision.softLabelConfirmed,
+    };
+  }
+
   return {
     expected_columns: expectedColumns,
     field_mappings: fieldMappings,
     price_unit_value_mappings: priceUnitValueMappings,
     modifier_group_bundles: modifierBundles.map((bundle) => ({ ...bundle })),
-    remaining_decisions: { ...remainingDecisions },
+    remaining_decisions: savedRemainingDecisions,
   };
 }
 
@@ -767,6 +820,22 @@ export function MenuImportWizardPage() {
   const [savedMappings, setSavedMappings] = useState<SavedImportMapping[]>([]);
   const [savedMappingsLoading, setSavedMappingsLoading] = useState(false);
   const [savedMappingsError, setSavedMappingsError] = useState<string | null>(null);
+  const [providerCatalog, setProviderCatalog] = useState<MenuImportProviderCatalogEntry[]>([]);
+  const [providerCatalogLoading, setProviderCatalogLoading] = useState(false);
+  const [providerCatalogError, setProviderCatalogError] = useState<string | null>(null);
+
+  const loadProviderCatalog = useCallback(async () => {
+    setProviderCatalogLoading(true);
+    setProviderCatalogError(null);
+    try {
+      setProviderCatalog(await listMenuImportProviders());
+    } catch (error) {
+      setProviderCatalogError(getErrorMessage(error, 'Unable to load external providers.'));
+    } finally {
+      setProviderCatalogLoading(false);
+    }
+  }, []);
+
   const loadSavedMappings = useCallback(async () => {
     setSavedMappingsLoading(true);
     setSavedMappingsError(null);
@@ -791,6 +860,10 @@ export function MenuImportWizardPage() {
   useEffect(() => {
     void loadSavedMappings();
   }, [loadSavedMappings]);
+
+  useEffect(() => {
+    void loadProviderCatalog();
+  }, [loadProviderCatalog]);
 
   const previewRows = useMemo(() => parsedCSV?.rows.slice(0, 10) ?? [], [parsedCSV?.rows]);
   const rowsWithEdits = useMemo<UploadRowEntry[]>(() => {
@@ -946,39 +1019,60 @@ export function MenuImportWizardPage() {
     return out;
   }, [configuredBundles]);
 
+  const providerCatalogByKey = useMemo(() => {
+    const out = new Map<string, MenuImportProviderCatalogEntry>();
+    for (const provider of providerCatalog) {
+      out.set(provider.provider_key, provider);
+    }
+    return out;
+  }, [providerCatalog]);
+
   const pendingDecisionColumns = useMemo(
     () =>
       columnsAvailableForDecision.filter((column) => {
-        const decision = remainingDecisions[column] ?? {
-          mode: 'unassigned' as RemainingMode,
-          ruleType: '',
-          label: column,
-          softLabelConfirmed: false,
-        };
+        const decision = remainingDecisions[column] ?? createDefaultRemainingDecision(column);
+        if (decision.mode === 'external_provider') {
+          if (!decision.providerKey) {
+            return true;
+          }
+          const provider = providerCatalogByKey.get(decision.providerKey);
+          if (!provider) {
+            return true;
+          }
+          if (!provider.is_org_active && decision.makeActive === null) {
+            return true;
+          }
+          return false;
+        }
         return (
           decision.mode === 'unassigned' ||
           (decision.mode === 'hard_rule' && !decision.ruleType) ||
           (decision.mode === 'soft_rule' && !decision.softLabelConfirmed)
         );
       }),
-    [columnsAvailableForDecision, remainingDecisions],
+    [columnsAvailableForDecision, providerCatalogByKey, remainingDecisions],
   );
   const addressedDecisionColumns = useMemo(
     () =>
       columnsAvailableForDecision.filter((column) => {
-        const decision = remainingDecisions[column] ?? {
-          mode: 'unassigned' as RemainingMode,
-          ruleType: '',
-          label: column,
-          softLabelConfirmed: false,
-        };
+        const decision = remainingDecisions[column] ?? createDefaultRemainingDecision(column);
+        if (decision.mode === 'external_provider') {
+          if (!decision.providerKey) {
+            return false;
+          }
+          const provider = providerCatalogByKey.get(decision.providerKey);
+          if (!provider) {
+            return false;
+          }
+          return provider.is_org_active || decision.makeActive !== null;
+        }
         return (
           decision.mode === 'skip' ||
           (decision.mode === 'soft_rule' && decision.softLabelConfirmed) ||
           (decision.mode === 'hard_rule' && !!decision.ruleType)
         );
       }),
-    [columnsAvailableForDecision, remainingDecisions],
+    [columnsAvailableForDecision, providerCatalogByKey, remainingDecisions],
   );
   const addressedDecisionColumnSet = useMemo(
     () => new Set(addressedDecisionColumns),
@@ -1014,6 +1108,66 @@ export function MenuImportWizardPage() {
     return Array.from(counts.entries())
       .filter(([, count]) => count > 1)
       .map(([ruleType]) => ruleType);
+  }, [columnsAvailableForDecision, remainingDecisions]);
+
+  const externalProviderDecisionColumns = useMemo(
+    () =>
+      columnsAvailableForDecision.filter(
+        (column) => remainingDecisions[column]?.mode === 'external_provider',
+      ),
+    [columnsAvailableForDecision, remainingDecisions],
+  );
+
+  const missingExternalProviderColumns = useMemo(
+    () =>
+      columnsAvailableForDecision.filter((column) => {
+        const decision = remainingDecisions[column];
+        return decision?.mode === 'external_provider' && !decision.providerKey;
+      }),
+    [columnsAvailableForDecision, remainingDecisions],
+  );
+
+  const unknownExternalProviderColumns = useMemo(
+    () =>
+      columnsAvailableForDecision.filter((column) => {
+        const decision = remainingDecisions[column];
+        return (
+          decision?.mode === 'external_provider' &&
+          !!decision.providerKey &&
+          !providerCatalogByKey.has(decision.providerKey)
+        );
+      }),
+    [columnsAvailableForDecision, providerCatalogByKey, remainingDecisions],
+  );
+
+  const missingExternalProviderActivationColumns = useMemo(
+    () =>
+      columnsAvailableForDecision.filter((column) => {
+        const decision = remainingDecisions[column];
+        if (decision?.mode !== 'external_provider' || !decision.providerKey) {
+          return false;
+        }
+        const provider = providerCatalogByKey.get(decision.providerKey);
+        if (!provider) {
+          return false;
+        }
+        return !provider.is_org_active && decision.makeActive === null;
+      }),
+    [columnsAvailableForDecision, providerCatalogByKey, remainingDecisions],
+  );
+
+  const duplicateExternalProviderKeys = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const column of columnsAvailableForDecision) {
+      const decision = remainingDecisions[column];
+      if (!decision || decision.mode !== 'external_provider' || !decision.providerKey) {
+        continue;
+      }
+      counts.set(decision.providerKey, (counts.get(decision.providerKey) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .filter(([, count]) => count > 1)
+      .map(([providerKey]) => providerKey);
   }, [columnsAvailableForDecision, remainingDecisions]);
 
   const rowErrorsByRow = useMemo(() => {
@@ -1136,10 +1290,19 @@ export function MenuImportWizardPage() {
     return Array.from(groups.entries());
   }, [mappingResult]);
 
+  const providerCatalogUnavailableForExternalMappings =
+    externalProviderDecisionColumns.length > 0 &&
+    (providerCatalogLoading || !!providerCatalogError || providerCatalog.length === 0);
+
   const step3Ready =
     pendingDecisionColumns.length === 0 &&
     missingRuleTypeColumns.length === 0 &&
     duplicateRuleTypes.length === 0 &&
+    missingExternalProviderColumns.length === 0 &&
+    unknownExternalProviderColumns.length === 0 &&
+    missingExternalProviderActivationColumns.length === 0 &&
+    duplicateExternalProviderKeys.length === 0 &&
+    !providerCatalogUnavailableForExternalMappings &&
     incompleteBundleIDs.size === 0;
 
   const isHeaderUsedByOtherField = (column: string, field: MappingKey): boolean =>
@@ -1170,14 +1333,7 @@ export function MenuImportWizardPage() {
   };
 
   const getDecision = (column: string): RemainingDecision => {
-    return (
-      remainingDecisions[column] ?? {
-        mode: 'unassigned',
-        ruleType: '',
-        label: column,
-        softLabelConfirmed: false,
-      }
-    );
+    return remainingDecisions[column] ?? createDefaultRemainingDecision(column);
   };
 
   const invalidateValidation = () => {
@@ -1293,13 +1449,12 @@ export function MenuImportWizardPage() {
       if (!current || current.mode === 'unassigned') {
         return previous;
       }
+      const reset = createDefaultRemainingDecision(column);
       return {
         ...previous,
         [column]: {
-          mode: 'unassigned',
-          ruleType: '',
+          ...reset,
           label: current.label || column,
-          softLabelConfirmed: false,
         },
       };
     });
@@ -1367,12 +1522,7 @@ export function MenuImportWizardPage() {
     }
 
     setRemainingDecisions((previous) => {
-      const current = previous[column] ?? {
-        mode: 'unassigned' as RemainingMode,
-        ruleType: '',
-        label: column,
-        softLabelConfirmed: false,
-      };
+      const current = previous[column] ?? createDefaultRemainingDecision(column);
 
       const next: RemainingDecision = {
         mode,
@@ -1384,6 +1534,14 @@ export function MenuImportWizardPage() {
               ? current.softLabelConfirmed
               : false
             : true,
+        providerKey:
+          mode === 'external_provider' && current.mode === 'external_provider'
+            ? current.providerKey
+            : '',
+        makeActive:
+          mode === 'external_provider' && current.mode === 'external_provider'
+            ? current.makeActive
+            : null,
       };
 
       return {
@@ -1397,12 +1555,7 @@ export function MenuImportWizardPage() {
 
   const setDecisionRuleType = (column: string, ruleType: MenuImportRuleType | '') => {
     setRemainingDecisions((previous) => {
-      const current = previous[column] ?? {
-        mode: 'hard_rule' as RemainingMode,
-        ruleType: '',
-        label: column,
-        softLabelConfirmed: false,
-      };
+      const current = previous[column] ?? createDefaultRemainingDecision(column);
       return {
         ...previous,
         [column]: {
@@ -1411,6 +1564,50 @@ export function MenuImportWizardPage() {
           ruleType,
           label: current.label || column,
           softLabelConfirmed: true,
+          providerKey: '',
+          makeActive: null,
+        },
+      };
+    });
+    invalidateValidation();
+  };
+
+  const setDecisionProviderKey = (column: string, providerKey: string) => {
+    const normalizedProviderKey = providerKey.trim();
+    setRemainingDecisions((previous) => {
+      const current = previous[column] ?? createDefaultRemainingDecision(column);
+      const provider = providerCatalogByKey.get(normalizedProviderKey);
+      return {
+        ...previous,
+        [column]: {
+          ...current,
+          mode: 'external_provider',
+          ruleType: '',
+          label: current.label || column,
+          softLabelConfirmed: true,
+          providerKey: normalizedProviderKey,
+          makeActive:
+            provider?.is_org_active || current.providerKey !== normalizedProviderKey
+              ? null
+              : current.makeActive,
+        },
+      };
+    });
+    invalidateValidation();
+  };
+
+  const setDecisionMakeActive = (column: string, makeActive: boolean | null) => {
+    setRemainingDecisions((previous) => {
+      const current = previous[column] ?? createDefaultRemainingDecision(column);
+      return {
+        ...previous,
+        [column]: {
+          ...current,
+          mode: 'external_provider',
+          ruleType: '',
+          label: current.label || column,
+          softLabelConfirmed: true,
+          makeActive,
         },
       };
     });
@@ -1419,12 +1616,7 @@ export function MenuImportWizardPage() {
 
   const setDecisionLabel = (column: string, label: string) => {
     setRemainingDecisions((previous) => {
-      const current = previous[column] ?? {
-        mode: 'soft_rule' as RemainingMode,
-        ruleType: '',
-        label: column,
-        softLabelConfirmed: false,
-      };
+      const current = previous[column] ?? createDefaultRemainingDecision(column);
       return {
         ...previous,
         [column]: {
@@ -1433,6 +1625,8 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label,
           softLabelConfirmed: current.softLabelConfirmed,
+          providerKey: '',
+          makeActive: null,
         },
       };
     });
@@ -1441,12 +1635,7 @@ export function MenuImportWizardPage() {
 
   const confirmSoftRuleDecision = (column: string) => {
     setRemainingDecisions((previous) => {
-      const current = previous[column] ?? {
-        mode: 'soft_rule' as RemainingMode,
-        ruleType: '',
-        label: column,
-        softLabelConfirmed: false,
-      };
+      const current = previous[column] ?? createDefaultRemainingDecision(column);
       return {
         ...previous,
         [column]: {
@@ -1455,6 +1644,8 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: current.label.trim() || column,
           softLabelConfirmed: true,
+          providerKey: '',
+          makeActive: null,
         },
       };
     });
@@ -1470,6 +1661,8 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: previous[column]?.label || column,
           softLabelConfirmed: true,
+          providerKey: '',
+          makeActive: null,
         };
       }
       return next;
@@ -1512,6 +1705,7 @@ export function MenuImportWizardPage() {
 
     const ruleMappings: Partial<Record<MenuImportRuleType, string>> = {};
     const softRuleMappings: Array<{ column: string; label: string }> = [];
+    const externalProviderMappings: MenuImportExternalProviderMapping[] = [];
 
     for (const column of columnsAvailableForDecision) {
       const decision = getDecision(column);
@@ -1522,6 +1716,18 @@ export function MenuImportWizardPage() {
         softRuleMappings.push({
           column,
           label: decision.label.trim() || column,
+        });
+      }
+      if (decision.mode === 'external_provider' && decision.providerKey) {
+        const provider = providerCatalogByKey.get(decision.providerKey);
+        externalProviderMappings.push({
+          column,
+          provider_key: decision.providerKey,
+          external_field: 'external_item_key',
+          make_active:
+            provider && !provider.is_org_active && decision.makeActive !== null
+              ? decision.makeActive
+              : undefined,
         });
       }
     }
@@ -1550,6 +1756,8 @@ export function MenuImportWizardPage() {
       modifier_group_bundles: modifierGroupBundles.length > 0 ? modifierGroupBundles : undefined,
       rule_mappings: Object.keys(ruleMappings).length > 0 ? ruleMappings : undefined,
       soft_rule_mappings: softRuleMappings.length > 0 ? softRuleMappings : undefined,
+      external_provider_mappings:
+        externalProviderMappings.length > 0 ? externalProviderMappings : undefined,
     };
   };
 
@@ -1688,12 +1896,7 @@ export function MenuImportWizardPage() {
       }
       const decision = storedDecisions[column];
       if (!decision) {
-        nextDecisions[column] = {
-          mode: 'unassigned',
-          ruleType: '',
-          label: column,
-          softLabelConfirmed: false,
-        };
+        nextDecisions[column] = createDefaultRemainingDecision(column);
         continue;
       }
       if (decision.mode === 'hard_rule') {
@@ -1702,6 +1905,8 @@ export function MenuImportWizardPage() {
           ruleType: decision.ruleType,
           label: decision.label || column,
           softLabelConfirmed: true,
+          providerKey: '',
+          makeActive: null,
         };
         continue;
       }
@@ -1711,6 +1916,19 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: decision.label || column,
           softLabelConfirmed: decision.softLabelConfirmed,
+          providerKey: '',
+          makeActive: null,
+        };
+        continue;
+      }
+      if (decision.mode === 'external_provider') {
+        nextDecisions[column] = {
+          mode: 'external_provider',
+          ruleType: '',
+          label: decision.label || column,
+          softLabelConfirmed: true,
+          providerKey: decision.providerKey || '',
+          makeActive: typeof decision.makeActive === 'boolean' ? decision.makeActive : null,
         };
         continue;
       }
@@ -1720,15 +1938,12 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: decision.label || column,
           softLabelConfirmed: true,
+          providerKey: '',
+          makeActive: null,
         };
         continue;
       }
-      nextDecisions[column] = {
-        mode: 'unassigned',
-        ruleType: '',
-        label: column,
-        softLabelConfirmed: false,
-      };
+      nextDecisions[column] = createDefaultRemainingDecision(column);
     }
 
     setFieldMappings(appliedFields);
@@ -1791,7 +2006,11 @@ export function MenuImportWizardPage() {
     }
     for (const column of columnsAvailableForDecision) {
       const decision = getDecision(column);
-      if (decision.mode === 'hard_rule' || decision.mode === 'soft_rule') {
+      if (
+        decision.mode === 'hard_rule' ||
+        decision.mode === 'soft_rule' ||
+        decision.mode === 'external_provider'
+      ) {
         expectedColumns.add(column);
       }
     }
@@ -1918,12 +2137,7 @@ export function MenuImportWizardPage() {
       const remaining = parsed.headers.filter((header) => !mappedSet.has(header));
       const defaults: Record<string, RemainingDecision> = {};
       for (const column of remaining) {
-        defaults[column] = {
-          mode: 'unassigned',
-          ruleType: '',
-          label: column,
-          softLabelConfirmed: false,
-        };
+        defaults[column] = createDefaultRemainingDecision(column);
       }
       setRemainingDecisions(defaults);
       setModifierBundles([]);
@@ -2064,6 +2278,12 @@ export function MenuImportWizardPage() {
       : null;
   const renderDecisionCard = (column: string) => {
     const decision = getDecision(column);
+    const selectedProvider = decision.providerKey
+      ? (providerCatalogByKey.get(decision.providerKey) ?? null)
+      : null;
+    const canChooseExternalProvider =
+      !providerCatalogLoading && !providerCatalogError && providerCatalog.length > 0;
+
     return (
       <div key={`decision-${column}`} className={styles.fieldRow}>
         <p className={styles.cardTitle}>{column}</p>
@@ -2081,6 +2301,9 @@ export function MenuImportWizardPage() {
             <option value="unassigned">Choose an action...</option>
             <option value="hard_rule">Map as hard rule</option>
             <option value="soft_rule">Map as soft note</option>
+            <option value="external_provider" disabled={!canChooseExternalProvider}>
+              Map as external provider key
+            </option>
             <option value="skip">Skip</option>
           </select>
         </label>
@@ -2144,6 +2367,84 @@ export function MenuImportWizardPage() {
                 </Button>
               </>
             )}
+          </>
+        ) : null}
+
+        {decision.mode === 'external_provider' ? (
+          <>
+            {providerCatalogLoading ? (
+              <p className={styles.helperSmall}>Loading providers...</p>
+            ) : null}
+            {providerCatalogError ? (
+              <>
+                <p className={styles.warning}>{providerCatalogError}</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onPress={() => void loadProviderCatalog()}
+                >
+                  Retry provider load
+                </Button>
+              </>
+            ) : null}
+            {!providerCatalogLoading && !providerCatalogError && providerCatalog.length === 0 ? (
+              <p className={styles.warning}>No external providers are available for mapping.</p>
+            ) : null}
+            {!providerCatalogLoading && !providerCatalogError && providerCatalog.length > 0 ? (
+              <label className={styles.inputLabel}>
+                Provider
+                <select
+                  className={styles.selectControl}
+                  value={decision.providerKey}
+                  onChange={(event) => setDecisionProviderKey(column, event.target.value)}
+                >
+                  <option value="">Select provider...</option>
+                  {providerCatalog.map((provider) => (
+                    <option
+                      key={`${column}-provider-${provider.provider_key}`}
+                      value={provider.provider_key}
+                    >
+                      {provider.label || provider.provider_key} ({provider.provider_key})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {decision.providerKey && !selectedProvider ? (
+              <p className={styles.warning}>
+                Selected provider {decision.providerKey} is not available in the current catalog.
+              </p>
+            ) : null}
+            {selectedProvider && !selectedProvider.is_org_active ? (
+              <>
+                <p className={styles.helperSmall}>
+                  {selectedProvider.is_org_configured
+                    ? 'This provider is configured for your org but currently inactive.'
+                    : 'This provider is not configured for your org yet.'}
+                </p>
+                <label className={styles.inputLabel}>
+                  Make Active?
+                  <select
+                    className={styles.selectControl}
+                    value={decision.makeActive === null ? '' : decision.makeActive ? 'yes' : 'no'}
+                    onChange={(event) =>
+                      setDecisionMakeActive(
+                        column,
+                        event.target.value === '' ? null : event.target.value === 'yes',
+                      )
+                    }
+                  >
+                    <option value="">Choose yes or no...</option>
+                    <option value="yes">Yes, activate for this org</option>
+                    <option value="no">No, keep inactive</option>
+                  </select>
+                </label>
+              </>
+            ) : null}
+            {selectedProvider?.is_org_active ? (
+              <p className={styles.helperSmall}>Provider is already active for this org.</p>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -2537,12 +2838,8 @@ export function MenuImportWizardPage() {
                 const remainingSet = new Set(unmappedColumnsAfterFields);
                 const defaults: Record<string, RemainingDecision> = {};
                 for (const column of unmappedColumnsAfterFields) {
-                  defaults[column] = remainingDecisions[column] ?? {
-                    mode: 'unassigned',
-                    ruleType: '',
-                    label: column,
-                    softLabelConfirmed: false,
-                  };
+                  defaults[column] =
+                    remainingDecisions[column] ?? createDefaultRemainingDecision(column);
                 }
                 setRemainingDecisions(defaults);
                 setModifierBundles((previous) =>
@@ -2577,15 +2874,16 @@ export function MenuImportWizardPage() {
         <section className={styles.panel}>
           <h2 className={styles.sectionTitle}>Step 3: Column Grouping</h2>
           <p className={styles.helper}>
-            Bundle columns for modifier groups, map remaining columns as hard rules or soft notes,
-            and explicitly skip the rest.
+            Bundle columns for modifier groups, then map remaining columns as hard rules, soft
+            notes, external provider keys, or skip.
           </p>
 
           <div className={styles.mappingGuide}>
             <p className={styles.mappingGuideTitle}>How to use this step</p>
             <p className={styles.mappingGuideText}>
               Some columns work together to define one modifier group, such as group name, choices,
-              and pricing. Create bundles first, then map remaining columns as rules or notes.
+              and pricing. Create bundles first, then decide whether each remaining column should be
+              a hard rule, soft note, external provider key, or skipped.
             </p>
           </div>
 
@@ -2754,10 +3052,28 @@ export function MenuImportWizardPage() {
             </div>
           ) : null}
 
+          {providerCatalogLoading ? (
+            <p className={styles.muted}>Loading external provider options...</p>
+          ) : null}
+          {providerCatalogError ? (
+            <>
+              <p className={styles.warning}>
+                External provider options failed to load: {providerCatalogError}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onPress={() => void loadProviderCatalog()}
+              >
+                Retry provider load
+              </Button>
+            </>
+          ) : null}
           {pendingDecisionColumns.length > 0 ? (
             <p className={styles.warning}>
-              Complete actions for remaining columns (select hard-rule type and confirm soft-rule
-              labels): {pendingDecisionColumns.join(', ')}.
+              Complete actions for remaining columns (hard-rule type, soft-rule confirmation, or
+              provider + activation choice): {pendingDecisionColumns.join(', ')}.
             </p>
           ) : null}
           {missingRuleTypeColumns.length > 0 ? (
@@ -2769,6 +3085,33 @@ export function MenuImportWizardPage() {
             <p className={styles.warning}>
               Each hard rule type can only be mapped once. Duplicate:{' '}
               {duplicateRuleTypes.join(', ')}.
+            </p>
+          ) : null}
+          {missingExternalProviderColumns.length > 0 ? (
+            <p className={styles.warning}>
+              Select an external provider for: {missingExternalProviderColumns.join(', ')}.
+            </p>
+          ) : null}
+          {missingExternalProviderActivationColumns.length > 0 ? (
+            <p className={styles.warning}>
+              Choose Make Active? yes/no for: {missingExternalProviderActivationColumns.join(', ')}.
+            </p>
+          ) : null}
+          {duplicateExternalProviderKeys.length > 0 ? (
+            <p className={styles.warning}>
+              Each provider key can only be mapped once. Duplicate:{' '}
+              {duplicateExternalProviderKeys.join(', ')}.
+            </p>
+          ) : null}
+          {unknownExternalProviderColumns.length > 0 ? (
+            <p className={styles.warning}>
+              Selected provider keys are no longer available for:{' '}
+              {unknownExternalProviderColumns.join(', ')}.
+            </p>
+          ) : null}
+          {providerCatalogUnavailableForExternalMappings ? (
+            <p className={styles.warning}>
+              External provider mappings require a loaded provider catalog before continuing.
             </p>
           ) : null}
           {validationError ? (

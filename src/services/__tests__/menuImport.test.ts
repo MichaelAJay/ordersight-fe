@@ -65,12 +65,28 @@ describe('menuImport service', () => {
         description: 'Description',
       },
       modifiers: [{ column: 'Add-ons', group_name: 'Add-ons' }],
+      external_provider_mappings: [
+        {
+          column: 'EZ Item ID',
+          provider_key: 'ezcater',
+          external_field: 'external_item_key',
+          make_active: true,
+        },
+      ],
     });
 
     expect(postJSONMock).toHaveBeenCalledWith('/imports/csv/session-1/map', {
       required: { name: 'Item Name', price: 'Item Price' },
       optional: { description: 'Description' },
       modifiers: [{ column: 'Add-ons', group_name: 'Add-ons' }],
+      external_provider_mappings: [
+        {
+          column: 'EZ Item ID',
+          provider_key: 'ezcater',
+          external_field: 'external_item_key',
+          make_active: true,
+        },
+      ],
     });
     expect(result.row_errors).toHaveLength(1);
     expect(result.validated_preview).toHaveLength(1);
@@ -84,6 +100,44 @@ describe('menuImport service', () => {
       column: 'Add-ons',
       sample_values: ['Extra Mayo'],
     });
+  });
+
+  test('lists provider catalog with /imports/providers', async () => {
+    getJSONMock.mockResolvedValue({
+      providers: [
+        {
+          provider_key: 'ezcater',
+          label: 'EZCater',
+          is_org_active: false,
+          is_org_configured: true,
+        },
+        {
+          provider_key: 'doordash',
+          label: 'DoorDash',
+          is_org_active: true,
+          is_org_configured: true,
+        },
+      ],
+    });
+
+    const { listMenuImportProviders } = await import('../menuImport');
+    const result = await listMenuImportProviders();
+
+    expect(getJSONMock).toHaveBeenCalledWith('/imports/providers');
+    expect(result).toEqual([
+      {
+        provider_key: 'ezcater',
+        label: 'EZCater',
+        is_org_active: false,
+        is_org_configured: true,
+      },
+      {
+        provider_key: 'doordash',
+        label: 'DoorDash',
+        is_org_active: true,
+        is_org_configured: true,
+      },
+    ]);
   });
 
   test('commits CSV import with /imports/csv/:session/commit', async () => {

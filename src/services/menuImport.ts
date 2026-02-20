@@ -51,6 +51,20 @@ export interface MenuImportSoftRuleMapping {
   label: string;
 }
 
+export interface MenuImportExternalProviderMapping {
+  column: string;
+  provider_key: string;
+  external_field?: string | null;
+  make_active?: boolean;
+}
+
+export interface MenuImportProviderCatalogEntry {
+  provider_key: string;
+  label: string;
+  is_org_active: boolean;
+  is_org_configured: boolean;
+}
+
 export interface MenuImportSavedMappingPayload {
   expected_columns: string[];
   field_mappings: Record<string, string>;
@@ -78,6 +92,7 @@ export interface MenuImportMappingRequest {
   modifier_group_bundles?: MenuImportModifierGroupBundleMapping[];
   rule_mappings?: Partial<Record<MenuImportRuleType, string>>;
   soft_rule_mappings?: MenuImportSoftRuleMapping[];
+  external_provider_mappings?: MenuImportExternalProviderMapping[];
 }
 
 export interface MenuImportRowValidationError {
@@ -181,6 +196,10 @@ export interface MenuImportCommitRequest {
 
 export interface MenuImportSavedMappingsResponse {
   mappings: MenuImportSavedMappingRecord[];
+}
+
+export interface MenuImportProviderCatalogResponse {
+  providers: MenuImportProviderCatalogEntry[];
 }
 
 function normalizeString(value: unknown): string {
@@ -302,6 +321,25 @@ function normalizeSavedMappingsResponse(payload: unknown): MenuImportSavedMappin
   const mappingsRaw = Array.isArray(record['mappings']) ? record['mappings'] : [];
   return {
     mappings: mappingsRaw.map((entry) => normalizeSavedMappingRecord(entry)),
+  };
+}
+
+function normalizeProviderCatalogResponse(payload: unknown): MenuImportProviderCatalogResponse {
+  const record = normalizeObject(payload);
+  const providersRaw = Array.isArray(record['providers']) ? record['providers'] : [];
+  return {
+    providers: providersRaw
+      .filter((entry) => entry && typeof entry === 'object')
+      .map((entry) => {
+        const provider = normalizeObject(entry);
+        return {
+          provider_key: normalizeString(provider['provider_key']),
+          label: normalizeString(provider['label']),
+          is_org_active: provider['is_org_active'] === true,
+          is_org_configured: provider['is_org_configured'] === true,
+        };
+      })
+      .filter((entry) => entry.provider_key.length > 0),
   };
 }
 
@@ -473,6 +511,11 @@ export async function commitMenuImportCSV(
 export async function listMenuImportMappings(): Promise<MenuImportSavedMappingRecord[]> {
   const response = await getJSON<unknown>('/imports/mappings');
   return normalizeSavedMappingsResponse(response).mappings;
+}
+
+export async function listMenuImportProviders(): Promise<MenuImportProviderCatalogEntry[]> {
+  const response = await getJSON<unknown>('/imports/providers');
+  return normalizeProviderCatalogResponse(response).providers;
 }
 
 export async function createMenuImportMapping(
