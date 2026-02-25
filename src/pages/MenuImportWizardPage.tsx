@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { DropZone, FileTrigger, Text, isFileDropItem } from 'react-aria-components';
 import { Button } from '@/components/common/Button/Button';
@@ -7,6 +8,7 @@ import {
   commitMenuImportCSV,
   createMenuImportMapping,
   deleteMenuImportMapping,
+  invalidateMenuImportProvidersCache,
   listMenuImportMappings,
   listMenuImportProviders,
   mapMenuImportCSV,
@@ -731,6 +733,21 @@ function normalizeCommitSummary(raw: unknown): MenuImportCommitSummary | null {
   return {
     created_count: Math.max(0, createdCount),
     updated_count: Math.max(0, updatedCount),
+    external_mappings_created:
+      typeof record['external_mappings_created'] === 'number' &&
+      Number.isInteger(record['external_mappings_created'])
+        ? Math.max(0, record['external_mappings_created'])
+        : undefined,
+    external_mappings_updated:
+      typeof record['external_mappings_updated'] === 'number' &&
+      Number.isInteger(record['external_mappings_updated'])
+        ? Math.max(0, record['external_mappings_updated'])
+        : undefined,
+    external_mappings_conflicted:
+      typeof record['external_mappings_conflicted'] === 'number' &&
+      Number.isInteger(record['external_mappings_conflicted'])
+        ? Math.max(0, record['external_mappings_conflicted'])
+        : undefined,
     error_count: Math.max(0, errorCount),
     errors: errorsRaw
       .filter((entry) => entry && typeof entry === 'object')
@@ -769,11 +786,21 @@ function normalizeCommitSummary(raw: unknown): MenuImportCommitSummary | null {
       typeof record['rows_skipped'] === 'number' && Number.isInteger(record['rows_skipped'])
         ? Math.max(0, record['rows_skipped'])
         : undefined,
+    created_menu_id:
+      typeof record['created_menu_id'] === 'string' && record['created_menu_id'].trim().length > 0
+        ? record['created_menu_id'].trim()
+        : undefined,
+    assigned_item_count:
+      typeof record['assigned_item_count'] === 'number' &&
+      Number.isInteger(record['assigned_item_count'])
+        ? Math.max(0, record['assigned_item_count'])
+        : undefined,
   };
 }
 
 export function MenuImportWizardPage() {
   const navigate = useNavigate();
+  const { orgId } = useAuth();
 
   const [step, setStep] = useState<WizardStep>(0);
   const [maxStepReached, setMaxStepReached] = useState<WizardStep>(0);
@@ -824,17 +851,25 @@ export function MenuImportWizardPage() {
   const [providerCatalogLoading, setProviderCatalogLoading] = useState(false);
   const [providerCatalogError, setProviderCatalogError] = useState<string | null>(null);
 
-  const loadProviderCatalog = useCallback(async () => {
-    setProviderCatalogLoading(true);
-    setProviderCatalogError(null);
-    try {
-      setProviderCatalog(await listMenuImportProviders());
-    } catch (error) {
-      setProviderCatalogError(getErrorMessage(error, 'Unable to load external providers.'));
-    } finally {
-      setProviderCatalogLoading(false);
-    }
-  }, []);
+  const loadProviderCatalog = useCallback(
+    async (options?: { forceRefresh?: boolean }) => {
+      setProviderCatalogLoading(true);
+      setProviderCatalogError(null);
+      try {
+        setProviderCatalog(
+          await listMenuImportProviders({
+            org_id: orgId ?? null,
+            force_refresh: options?.forceRefresh === true,
+          }),
+        );
+      } catch (error) {
+        setProviderCatalogError(getErrorMessage(error, 'Unable to load external providers.'));
+      } finally {
+        setProviderCatalogLoading(false);
+      }
+    },
+    [orgId],
+  );
 
   const loadSavedMappings = useCallback(async () => {
     setSavedMappingsLoading(true);
@@ -862,7 +897,8 @@ export function MenuImportWizardPage() {
   }, [loadSavedMappings]);
 
   useEffect(() => {
-    void loadProviderCatalog();
+    invalidateMenuImportProvidersCache();
+    void loadProviderCatalog({ forceRefresh: true });
   }, [loadProviderCatalog]);
 
   const previewRows = useMemo(() => parsedCSV?.rows.slice(0, 10) ?? [], [parsedCSV?.rows]);
@@ -2382,7 +2418,7 @@ export function MenuImportWizardPage() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  onPress={() => void loadProviderCatalog()}
+                  onPress={() => void loadProviderCatalog({ forceRefresh: true })}
                 >
                   Retry provider load
                 </Button>
@@ -3064,7 +3100,7 @@ export function MenuImportWizardPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                onPress={() => void loadProviderCatalog()}
+                onPress={() => void loadProviderCatalog({ forceRefresh: true })}
               >
                 Retry provider load
               </Button>
@@ -3338,6 +3374,7 @@ export function MenuImportWizardPage() {
                           <th>Allergens</th>
                           <th>Hard Rules</th>
                           <th>Soft Rules</th>
+                          <th>External Providers</th>
                           <th>Modifier Groups</th>
                         </tr>
                       </thead>
@@ -3358,6 +3395,19 @@ export function MenuImportWizardPage() {
                                 return '';
                               }
                               return `${decision.label.trim() || column}: ${content}`;
+                            })
+                            .filter((value) => value.length > 0);
+                          const externalProviderLines = (row.external_provider_mappings ?? [])
+                            .map((mapping) => {
+                              const externalItemKey = mapping.external_item_key?.trim() ?? '';
+                              if (!externalItemKey) {
+                                return '';
+                              }
+                              const providerLabel =
+                                providerCatalogByKey.get(mapping.provider_key)?.label?.trim() ||
+                                mapping.provider_name?.trim() ||
+                                mapping.provider_key;
+                              return `${providerLabel || mapping.provider_key}: ${externalItemKey}`;
                             })
                             .filter((value) => value.length > 0);
 
@@ -3383,6 +3433,11 @@ export function MenuImportWizardPage() {
                                   : '—'}
                               </td>
                               <td>{softRuleLines.length > 0 ? softRuleLines.join(' • ') : '—'}</td>
+                              <td>
+                                {externalProviderLines.length > 0
+                                  ? externalProviderLines.join(' • ')
+                                  : '—'}
+                              </td>
                               <td>
                                 {row.modifier_groups && row.modifier_groups.length > 0
                                   ? row.modifier_groups
@@ -3501,7 +3556,10 @@ export function MenuImportWizardPage() {
                 Modifier groups created: {commitSummary.modifier_groups_created ?? 0} • Modifier
                 groups reused: {commitSummary.modifier_groups_reused ?? 0} • Hard rules created:{' '}
                 {commitSummary.hard_rules_created ?? 0} • Soft rules created:{' '}
-                {commitSummary.soft_rules_created ?? 0} • Rows skipped:{' '}
+                {commitSummary.soft_rules_created ?? 0} • External mappings created:{' '}
+                {commitSummary.external_mappings_created ?? 0} • External mappings updated:{' '}
+                {commitSummary.external_mappings_updated ?? 0} • External mappings conflicted:{' '}
+                {commitSummary.external_mappings_conflicted ?? 0} • Rows skipped:{' '}
                 {commitSummary.rows_skipped ?? 0}
               </p>
               {commitSummary.created_menu_id ? (

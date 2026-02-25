@@ -17,8 +17,10 @@ vi.mock('../http', () => ({
 }));
 
 describe('menuImport service', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { invalidateMenuImportProvidersCache } = await import('../menuImport');
+    invalidateMenuImportProvidersCache();
   });
 
   test('uploads CSV to /imports/csv/upload', async () => {
@@ -47,7 +49,22 @@ describe('menuImport service', () => {
   test('maps CSV columns with /imports/csv/:session/map', async () => {
     postJSONMock.mockResolvedValue({
       row_errors: [{ row: 2, errors: ['price is invalid'] }],
-      validated_preview: [{ row: 1, name: 'Turkey Club', price: 1200, price_unit: 'flat' }],
+      validated_preview: [
+        {
+          row: 1,
+          name: 'Turkey Club',
+          price: 1200,
+          price_unit: 'flat',
+          external_provider_mappings: [
+            {
+              provider_key: 'ezcater',
+              provider_name: 'EZCater',
+              external_item_key: '12345',
+              is_active: true,
+            },
+          ],
+        },
+      ],
       modifier_groups: [{ group_name: 'Add-ons', exists: false }],
       mapped_columns: [
         { field: 'required.name', column: 'Item Name', sample_values: ['Turkey Club'] },
@@ -100,6 +117,14 @@ describe('menuImport service', () => {
       column: 'Add-ons',
       sample_values: ['Extra Mayo'],
     });
+    expect(result.validated_preview[0]?.external_provider_mappings).toEqual([
+      {
+        provider_key: 'ezcater',
+        provider_name: 'EZCater',
+        external_item_key: '12345',
+        is_active: true,
+      },
+    ]);
   });
 
   test('lists provider catalog with /imports/providers', async () => {
@@ -140,10 +165,97 @@ describe('menuImport service', () => {
     ]);
   });
 
+  test('caches provider catalog responses by org and supports force refresh', async () => {
+    getJSONMock
+      .mockResolvedValueOnce({
+        providers: [
+          {
+            provider_key: 'ezcater',
+            label: 'EZCater',
+            is_org_active: false,
+            is_org_configured: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        providers: [
+          {
+            provider_key: 'doordash',
+            label: 'DoorDash',
+            is_org_active: true,
+            is_org_configured: true,
+          },
+        ],
+      });
+
+    const { listMenuImportProviders } = await import('../menuImport');
+
+    const first = await listMenuImportProviders({ org_id: 'org-1' });
+    const cached = await listMenuImportProviders({ org_id: 'org-1' });
+    const refreshed = await listMenuImportProviders({ org_id: 'org-1', force_refresh: true });
+
+    expect(getJSONMock).toHaveBeenCalledTimes(2);
+    expect(first).toEqual([
+      {
+        provider_key: 'ezcater',
+        label: 'EZCater',
+        is_org_active: false,
+        is_org_configured: true,
+      },
+    ]);
+    expect(cached).toEqual(first);
+    expect(refreshed).toEqual([
+      {
+        provider_key: 'doordash',
+        label: 'DoorDash',
+        is_org_active: true,
+        is_org_configured: true,
+      },
+    ]);
+  });
+
+  test('invalidates provider catalog cache for org switches', async () => {
+    getJSONMock
+      .mockResolvedValueOnce({
+        providers: [
+          {
+            provider_key: 'ezcater',
+            label: 'EZCater',
+            is_org_active: false,
+            is_org_configured: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        providers: [
+          {
+            provider_key: 'doordash',
+            label: 'DoorDash',
+            is_org_active: true,
+            is_org_configured: true,
+          },
+        ],
+      });
+
+    const { invalidateMenuImportProvidersCache, listMenuImportProviders } = await import(
+      '../menuImport'
+    );
+
+    await listMenuImportProviders({ org_id: 'org-1' });
+    await listMenuImportProviders({ org_id: 'org-1' });
+    invalidateMenuImportProvidersCache('org-1');
+    await listMenuImportProviders({ org_id: 'org-1' });
+
+    expect(getJSONMock).toHaveBeenCalledTimes(2);
+  });
+
   test('commits CSV import with /imports/csv/:session/commit', async () => {
     postJSONMock.mockResolvedValue({
       created_count: 4,
       updated_count: 2,
+      external_mappings_created: 2,
+      external_mappings_updated: 1,
+      external_mappings_conflicted: 0,
       error_count: 0,
       errors: [],
     });
@@ -155,6 +267,9 @@ describe('menuImport service', () => {
     expect(result).toMatchObject({
       created_count: 4,
       updated_count: 2,
+      external_mappings_created: 2,
+      external_mappings_updated: 1,
+      external_mappings_conflicted: 0,
       error_count: 0,
       errors: [],
     });
@@ -199,7 +314,13 @@ describe('menuImport service', () => {
             expected_columns: ['ItemName', 'Price'],
             field_mappings: { item_name: 'ItemName', base_price: 'Price' },
             modifier_group_bundles: [],
-            remaining_decisions: {},
+            remaining_decisions: {
+              'EZ Item ID': {
+                mode: 'external_provider',
+                provider_key: 'ezcater',
+                make_active: true,
+              },
+            },
           },
           created_by: 'user-1',
           created_at: '2026-02-17T00:00:00Z',
@@ -215,6 +336,11 @@ describe('menuImport service', () => {
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('Catering Sheet');
     expect(result[0].mapping.field_mappings.item_name).toBe('ItemName');
+    expect(result[0].mapping.remaining_decisions['EZ Item ID']).toEqual({
+      mode: 'external_provider',
+      provider_key: 'ezcater',
+      make_active: true,
+    });
   });
 
   test('creates saved mapping with /imports/mappings', async () => {

@@ -117,7 +117,15 @@ export interface MenuImportValidatedPreviewRow {
   modifier_groups?: MenuImportValidatedModifierGroup[];
   rules?: MenuImportValidatedRule[];
   soft_rules?: MenuImportValidatedSoftRule[];
+  external_provider_mappings?: MenuImportValidatedExternalProviderMapping[];
   errors?: string[];
+}
+
+export interface MenuImportValidatedExternalProviderMapping {
+  provider_key: string;
+  provider_name?: string;
+  external_item_key: string;
+  is_active?: boolean;
 }
 
 export interface MenuImportValidatedModifierOption {
@@ -176,6 +184,9 @@ export interface MenuImportCommitError {
 export interface MenuImportCommitSummary {
   created_count: number;
   updated_count: number;
+  external_mappings_created?: number;
+  external_mappings_updated?: number;
+  external_mappings_conflicted?: number;
   error_count: number;
   errors: MenuImportCommitError[];
   modifier_groups_created?: number;
@@ -201,6 +212,20 @@ export interface MenuImportSavedMappingsResponse {
 export interface MenuImportProviderCatalogResponse {
   providers: MenuImportProviderCatalogEntry[];
 }
+
+export interface ListMenuImportProvidersOptions {
+  org_id?: string | null;
+  force_refresh?: boolean;
+}
+
+const providerCatalogCacheTTLMS = 10 * 60 * 1000;
+
+type ProviderCatalogCacheEntry = {
+  providers: MenuImportProviderCatalogEntry[];
+  loaded_at_ms: number;
+};
+
+const providerCatalogCache = new Map<string, ProviderCatalogCacheEntry>();
 
 function normalizeString(value: unknown): string {
   if (typeof value !== 'string') {
@@ -250,6 +275,14 @@ function normalizeObject(value: unknown): Record<string, unknown> {
     return {};
   }
   return value as Record<string, unknown>;
+}
+
+function normalizeProviderCatalogCacheKey(orgID?: string | null): string {
+  const normalized = normalizeString(orgID);
+  if (!normalized) {
+    return '__default__';
+  }
+  return normalized;
 }
 
 function normalizeSavedMappingPayload(value: unknown): MenuImportSavedMappingPayload {
@@ -438,6 +471,21 @@ function normalizeCommitSummary(payload: unknown): MenuImportCommitSummary {
       typeof record['updated_count'] === 'number' && Number.isInteger(record['updated_count'])
         ? Math.max(0, record['updated_count'])
         : 0,
+    external_mappings_created:
+      typeof record['external_mappings_created'] === 'number' &&
+      Number.isInteger(record['external_mappings_created'])
+        ? Math.max(0, record['external_mappings_created'])
+        : undefined,
+    external_mappings_updated:
+      typeof record['external_mappings_updated'] === 'number' &&
+      Number.isInteger(record['external_mappings_updated'])
+        ? Math.max(0, record['external_mappings_updated'])
+        : undefined,
+    external_mappings_conflicted:
+      typeof record['external_mappings_conflicted'] === 'number' &&
+      Number.isInteger(record['external_mappings_conflicted'])
+        ? Math.max(0, record['external_mappings_conflicted'])
+        : undefined,
     error_count:
       typeof record['error_count'] === 'number' && Number.isInteger(record['error_count'])
         ? Math.max(0, record['error_count'])
@@ -513,9 +561,36 @@ export async function listMenuImportMappings(): Promise<MenuImportSavedMappingRe
   return normalizeSavedMappingsResponse(response).mappings;
 }
 
-export async function listMenuImportProviders(): Promise<MenuImportProviderCatalogEntry[]> {
+export function invalidateMenuImportProvidersCache(orgID?: string | null): void {
+  if (typeof orgID === 'undefined') {
+    providerCatalogCache.clear();
+    return;
+  }
+
+  providerCatalogCache.delete(normalizeProviderCatalogCacheKey(orgID));
+}
+
+export async function listMenuImportProviders(
+  options: ListMenuImportProvidersOptions = {},
+): Promise<MenuImportProviderCatalogEntry[]> {
+  const cacheKey = normalizeProviderCatalogCacheKey(options.org_id);
+  const forceRefresh = options.force_refresh === true;
+  const now = Date.now();
+
+  if (!forceRefresh) {
+    const cached = providerCatalogCache.get(cacheKey);
+    if (cached && now - cached.loaded_at_ms < providerCatalogCacheTTLMS) {
+      return cached.providers;
+    }
+  }
+
   const response = await getJSON<unknown>('/imports/providers');
-  return normalizeProviderCatalogResponse(response).providers;
+  const providers = normalizeProviderCatalogResponse(response).providers;
+  providerCatalogCache.set(cacheKey, {
+    providers,
+    loaded_at_ms: Date.now(),
+  });
+  return providers;
 }
 
 export async function createMenuImportMapping(
