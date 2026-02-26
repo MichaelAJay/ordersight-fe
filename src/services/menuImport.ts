@@ -416,30 +416,32 @@ function normalizeMappingValidationResult(payload: unknown): MenuImportMappingVa
             ? row['external_provider_mappings']
             : [];
 
-          const externalMappings = externalMappingsRaw
-            .filter((mapping) => mapping && typeof mapping === 'object')
-            .map((mapping) => {
-              const normalized = normalizeObject(mapping);
-              const direction = normalizeMappingDirection(normalized['direction']);
-              if (!direction) {
-                return null;
-              }
-              return {
-                provider_key: normalizeString(normalized['provider_key']),
-                provider_name: normalizeString(normalized['provider_name']) || undefined,
-                direction,
-                external_item_key: normalizeString(normalized['external_item_key']),
-                is_active: normalized['is_active'] === true,
-              };
-            })
-            .filter(
-              (mapping): mapping is MenuImportValidatedExternalProviderMapping =>
-                mapping !== null &&
-                mapping.provider_key.length > 0 &&
-                mapping.external_item_key.length > 0,
-            );
+          const externalMappings: MenuImportValidatedExternalProviderMapping[] = [];
+          for (const mapping of externalMappingsRaw) {
+            if (!mapping || typeof mapping !== 'object') {
+              continue;
+            }
+            const normalized = normalizeObject(mapping);
+            const direction = normalizeMappingDirection(normalized['direction']);
+            const providerKey = normalizeString(normalized['provider_key']);
+            const externalItemKey = normalizeString(normalized['external_item_key']);
+            if (!direction || !providerKey || !externalItemKey) {
+              continue;
+            }
+            const providerName = normalizeString(normalized['provider_name']);
+            externalMappings.push({
+              provider_key: providerKey,
+              provider_name: providerName || undefined,
+              direction,
+              external_item_key: externalItemKey,
+              is_active: normalized['is_active'] === true,
+            });
+          }
 
-          const normalizedRow = row as MenuImportValidatedPreviewRow;
+          const normalizedRow = row as unknown as Omit<
+            MenuImportValidatedPreviewRow,
+            'external_provider_mappings'
+          >;
           return {
             ...normalizedRow,
             external_provider_mappings: externalMappings.length > 0 ? externalMappings : undefined,

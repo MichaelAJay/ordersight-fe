@@ -2439,12 +2439,13 @@ export function MenuImportWizardPage() {
       selectedProvider !== null &&
       decision.direction !== '' &&
       providerSupportsDirection(selectedProvider, decision.direction);
+    const selectedDirection = decision.direction;
     const providersForDirection =
-      decision.direction === ''
-        ? []
-        : providerCatalog.filter((provider) =>
-            providerSupportsDirection(provider, decision.direction),
-          );
+      selectedDirection === 'inbound' || selectedDirection === 'outbound'
+        ? providerCatalog.filter((provider) =>
+            providerSupportsDirection(provider, selectedDirection),
+          )
+        : [];
     const canChooseExternalProvider =
       !providerCatalogLoading && !providerCatalogError && providerCatalog.length > 0;
 
