@@ -1,6 +1,7 @@
 import { api, delJSON, getJSON, patchJSON, postJSON } from './http';
 
 export type MenuImportPriceUnit = 'flat' | 'per_person' | 'per_unit';
+export type MenuImportMappingDirection = 'inbound' | 'outbound';
 export type MenuImportRuleType =
   | 'min_quantity'
   | 'max_quantity'
@@ -54,6 +55,7 @@ export interface MenuImportSoftRuleMapping {
 export interface MenuImportExternalProviderMapping {
   column: string;
   provider_key: string;
+  direction: MenuImportMappingDirection;
   external_field?: string | null;
   make_active?: boolean;
 }
@@ -63,6 +65,8 @@ export interface MenuImportProviderCatalogEntry {
   label: string;
   is_org_active: boolean;
   is_org_configured: boolean;
+  supports_inbound: boolean;
+  supports_outbound: boolean;
 }
 
 export interface MenuImportSavedMappingPayload {
@@ -124,6 +128,7 @@ export interface MenuImportValidatedPreviewRow {
 export interface MenuImportValidatedExternalProviderMapping {
   provider_key: string;
   provider_name?: string;
+  direction: MenuImportMappingDirection;
   external_item_key: string;
   is_active?: boolean;
 }
@@ -357,6 +362,13 @@ function normalizeSavedMappingsResponse(payload: unknown): MenuImportSavedMappin
   };
 }
 
+function normalizeMappingDirection(value: unknown): MenuImportMappingDirection | '' {
+  if (value === 'inbound' || value === 'outbound') {
+    return value;
+  }
+  return '';
+}
+
 function normalizeProviderCatalogResponse(payload: unknown): MenuImportProviderCatalogResponse {
   const record = normalizeObject(payload);
   const providersRaw = Array.isArray(record['providers']) ? record['providers'] : [];
@@ -370,6 +382,8 @@ function normalizeProviderCatalogResponse(payload: unknown): MenuImportProviderC
           label: normalizeString(provider['label']),
           is_org_active: provider['is_org_active'] === true,
           is_org_configured: provider['is_org_configured'] === true,
+          supports_inbound: provider['supports_inbound'] === true,
+          supports_outbound: provider['supports_outbound'] === true,
         };
       })
       .filter((entry) => entry.provider_key.length > 0),
@@ -396,7 +410,41 @@ function normalizeMappingValidationResult(payload: unknown): MenuImportMappingVa
   const preview = Array.isArray(record['validated_preview'])
     ? record['validated_preview']
         .filter((entry) => entry && typeof entry === 'object')
-        .map((entry) => entry as MenuImportValidatedPreviewRow)
+        .map((entry) => {
+          const row = normalizeObject(entry);
+          const externalMappingsRaw = Array.isArray(row['external_provider_mappings'])
+            ? row['external_provider_mappings']
+            : [];
+
+          const externalMappings = externalMappingsRaw
+            .filter((mapping) => mapping && typeof mapping === 'object')
+            .map((mapping) => {
+              const normalized = normalizeObject(mapping);
+              const direction = normalizeMappingDirection(normalized['direction']);
+              if (!direction) {
+                return null;
+              }
+              return {
+                provider_key: normalizeString(normalized['provider_key']),
+                provider_name: normalizeString(normalized['provider_name']) || undefined,
+                direction,
+                external_item_key: normalizeString(normalized['external_item_key']),
+                is_active: normalized['is_active'] === true,
+              };
+            })
+            .filter(
+              (mapping): mapping is MenuImportValidatedExternalProviderMapping =>
+                mapping !== null &&
+                mapping.provider_key.length > 0 &&
+                mapping.external_item_key.length > 0,
+            );
+
+          const normalizedRow = row as MenuImportValidatedPreviewRow;
+          return {
+            ...normalizedRow,
+            external_provider_mappings: externalMappings.length > 0 ? externalMappings : undefined,
+          };
+        })
     : [];
 
   const modifierGroups = Array.isArray(record['modifier_groups'])

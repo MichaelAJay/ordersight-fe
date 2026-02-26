@@ -59,6 +59,7 @@ describe('menuImport service', () => {
             {
               provider_key: 'ezcater',
               provider_name: 'EZCater',
+              direction: 'outbound',
               external_item_key: '12345',
               is_active: true,
             },
@@ -86,6 +87,7 @@ describe('menuImport service', () => {
         {
           column: 'EZ Item ID',
           provider_key: 'ezcater',
+          direction: 'outbound',
           external_field: 'external_item_key',
           make_active: true,
         },
@@ -100,6 +102,7 @@ describe('menuImport service', () => {
         {
           column: 'EZ Item ID',
           provider_key: 'ezcater',
+          direction: 'outbound',
           external_field: 'external_item_key',
           make_active: true,
         },
@@ -121,6 +124,7 @@ describe('menuImport service', () => {
       {
         provider_key: 'ezcater',
         provider_name: 'EZCater',
+        direction: 'outbound',
         external_item_key: '12345',
         is_active: true,
       },
@@ -135,12 +139,16 @@ describe('menuImport service', () => {
           label: 'EZCater',
           is_org_active: false,
           is_org_configured: true,
+          supports_inbound: true,
+          supports_outbound: true,
         },
         {
           provider_key: 'doordash',
           label: 'DoorDash',
           is_org_active: true,
           is_org_configured: true,
+          supports_inbound: false,
+          supports_outbound: true,
         },
       ],
     });
@@ -155,12 +163,16 @@ describe('menuImport service', () => {
         label: 'EZCater',
         is_org_active: false,
         is_org_configured: true,
+        supports_inbound: true,
+        supports_outbound: true,
       },
       {
         provider_key: 'doordash',
         label: 'DoorDash',
         is_org_active: true,
         is_org_configured: true,
+        supports_inbound: false,
+        supports_outbound: true,
       },
     ]);
   });
@@ -174,6 +186,8 @@ describe('menuImport service', () => {
             label: 'EZCater',
             is_org_active: false,
             is_org_configured: true,
+            supports_inbound: true,
+            supports_outbound: true,
           },
         ],
       })
@@ -184,6 +198,8 @@ describe('menuImport service', () => {
             label: 'DoorDash',
             is_org_active: true,
             is_org_configured: true,
+            supports_inbound: false,
+            supports_outbound: true,
           },
         ],
       });
@@ -201,6 +217,8 @@ describe('menuImport service', () => {
         label: 'EZCater',
         is_org_active: false,
         is_org_configured: true,
+        supports_inbound: true,
+        supports_outbound: true,
       },
     ]);
     expect(cached).toEqual(first);
@@ -210,6 +228,8 @@ describe('menuImport service', () => {
         label: 'DoorDash',
         is_org_active: true,
         is_org_configured: true,
+        supports_inbound: false,
+        supports_outbound: true,
       },
     ]);
   });
@@ -223,6 +243,8 @@ describe('menuImport service', () => {
             label: 'EZCater',
             is_org_active: false,
             is_org_configured: true,
+            supports_inbound: true,
+            supports_outbound: true,
           },
         ],
       })
@@ -233,6 +255,8 @@ describe('menuImport service', () => {
             label: 'DoorDash',
             is_org_active: true,
             is_org_configured: true,
+            supports_inbound: false,
+            supports_outbound: true,
           },
         ],
       });

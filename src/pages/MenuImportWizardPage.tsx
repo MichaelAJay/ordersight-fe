@@ -15,6 +15,7 @@ import {
   renameMenuImportMapping,
   uploadMenuImportCSV,
   type MenuImportCommitSummary,
+  type MenuImportMappingDirection,
   type MenuImportExternalProviderMapping,
   type MenuImportMappingRequest,
   type MenuImportMappingValidationResult,
@@ -71,6 +72,7 @@ type RemainingDecision = {
   ruleType: MenuImportRuleType | '';
   label: string;
   softLabelConfirmed: boolean;
+  direction: MenuImportMappingDirection | '';
   providerKey: string;
   makeActive: boolean | null;
 };
@@ -130,6 +132,7 @@ const RULE_TYPE_OPTIONS: Array<{ value: MenuImportRuleType; label: string; helpe
 ];
 const DELIMITER_OPTIONS = ['|', ';', '/'];
 const PRICE_UNIT_OPTIONS: MenuImportPriceUnit[] = ['flat', 'per_person', 'per_unit'];
+const EXTERNAL_PROVIDER_DIRECTIONS: MenuImportMappingDirection[] = ['inbound', 'outbound'];
 
 const REQUIRED_FIELDS: Array<{
   key: Extract<MappingKey, 'item_name' | 'base_price'>;
@@ -560,12 +563,23 @@ function formatDateTime(value: string): string {
   return date.toLocaleString();
 }
 
+function providerSupportsDirection(
+  provider: MenuImportProviderCatalogEntry,
+  direction: MenuImportMappingDirection,
+): boolean {
+  if (direction === 'inbound') {
+    return provider.supports_inbound;
+  }
+  return provider.supports_outbound;
+}
+
 function createDefaultRemainingDecision(column: string): RemainingDecision {
   return {
     mode: 'unassigned',
     ruleType: '',
     label: column,
     softLabelConfirmed: false,
+    direction: '',
     providerKey: '',
     makeActive: null,
   };
@@ -644,6 +658,8 @@ function fromSavedMappingRecord(record: MenuImportSavedMappingRecord): SavedImpo
         : typeof decision['provider_key'] === 'string'
           ? decision['provider_key']
           : '';
+    const directionRaw = decision['direction'];
+    const direction = directionRaw === 'inbound' || directionRaw === 'outbound' ? directionRaw : '';
     const makeActiveRaw = decision['makeActive'] ?? decision['make_active'];
     decisions[column] = {
       mode,
@@ -655,6 +671,7 @@ function fromSavedMappingRecord(record: MenuImportSavedMappingRecord): SavedImpo
             ? decision['softLabelConfirmed']
             : true
           : true,
+      direction: mode === 'external_provider' ? direction : '',
       providerKey: providerKeyRaw.trim(),
       makeActive: typeof makeActiveRaw === 'boolean' ? makeActiveRaw : null,
     };
@@ -688,6 +705,7 @@ function toSavedMappingPayload(
         ruleType: '',
         label: decision.label,
         softLabelConfirmed: true,
+        direction: decision.direction,
         provider_key: decision.providerKey,
         make_active: decision.makeActive,
       };
@@ -1068,11 +1086,17 @@ export function MenuImportWizardPage() {
       columnsAvailableForDecision.filter((column) => {
         const decision = remainingDecisions[column] ?? createDefaultRemainingDecision(column);
         if (decision.mode === 'external_provider') {
+          if (!decision.direction) {
+            return true;
+          }
           if (!decision.providerKey) {
             return true;
           }
           const provider = providerCatalogByKey.get(decision.providerKey);
           if (!provider) {
+            return true;
+          }
+          if (!providerSupportsDirection(provider, decision.direction)) {
             return true;
           }
           if (!provider.is_org_active && decision.makeActive === null) {
@@ -1093,11 +1117,11 @@ export function MenuImportWizardPage() {
       columnsAvailableForDecision.filter((column) => {
         const decision = remainingDecisions[column] ?? createDefaultRemainingDecision(column);
         if (decision.mode === 'external_provider') {
-          if (!decision.providerKey) {
+          if (!decision.direction || !decision.providerKey) {
             return false;
           }
           const provider = providerCatalogByKey.get(decision.providerKey);
-          if (!provider) {
+          if (!provider || !providerSupportsDirection(provider, decision.direction)) {
             return false;
           }
           return provider.is_org_active || decision.makeActive !== null;
@@ -1154,11 +1178,22 @@ export function MenuImportWizardPage() {
     [columnsAvailableForDecision, remainingDecisions],
   );
 
+  const missingExternalProviderDirectionColumns = useMemo(
+    () =>
+      columnsAvailableForDecision.filter((column) => {
+        const decision = remainingDecisions[column];
+        return decision?.mode === 'external_provider' && !decision.direction;
+      }),
+    [columnsAvailableForDecision, remainingDecisions],
+  );
+
   const missingExternalProviderColumns = useMemo(
     () =>
       columnsAvailableForDecision.filter((column) => {
         const decision = remainingDecisions[column];
-        return decision?.mode === 'external_provider' && !decision.providerKey;
+        return (
+          decision?.mode === 'external_provider' && !!decision.direction && !decision.providerKey
+        );
       }),
     [columnsAvailableForDecision, remainingDecisions],
   );
@@ -1176,15 +1211,39 @@ export function MenuImportWizardPage() {
     [columnsAvailableForDecision, providerCatalogByKey, remainingDecisions],
   );
 
-  const missingExternalProviderActivationColumns = useMemo(
+  const unsupportedExternalProviderDirectionColumns = useMemo(
     () =>
       columnsAvailableForDecision.filter((column) => {
         const decision = remainingDecisions[column];
-        if (decision?.mode !== 'external_provider' || !decision.providerKey) {
+        if (
+          decision?.mode !== 'external_provider' ||
+          !decision.providerKey ||
+          !decision.direction
+        ) {
           return false;
         }
         const provider = providerCatalogByKey.get(decision.providerKey);
         if (!provider) {
+          return false;
+        }
+        return !providerSupportsDirection(provider, decision.direction);
+      }),
+    [columnsAvailableForDecision, providerCatalogByKey, remainingDecisions],
+  );
+
+  const missingExternalProviderActivationColumns = useMemo(
+    () =>
+      columnsAvailableForDecision.filter((column) => {
+        const decision = remainingDecisions[column];
+        if (
+          decision?.mode !== 'external_provider' ||
+          !decision.providerKey ||
+          !decision.direction
+        ) {
+          return false;
+        }
+        const provider = providerCatalogByKey.get(decision.providerKey);
+        if (!provider || !providerSupportsDirection(provider, decision.direction)) {
           return false;
         }
         return !provider.is_org_active && decision.makeActive === null;
@@ -1192,18 +1251,27 @@ export function MenuImportWizardPage() {
     [columnsAvailableForDecision, providerCatalogByKey, remainingDecisions],
   );
 
-  const duplicateExternalProviderKeys = useMemo(() => {
+  const duplicateExternalProviderDirectionPairs = useMemo(() => {
     const counts = new Map<string, number>();
     for (const column of columnsAvailableForDecision) {
       const decision = remainingDecisions[column];
-      if (!decision || decision.mode !== 'external_provider' || !decision.providerKey) {
+      if (
+        !decision ||
+        decision.mode !== 'external_provider' ||
+        !decision.providerKey ||
+        !decision.direction
+      ) {
         continue;
       }
-      counts.set(decision.providerKey, (counts.get(decision.providerKey) ?? 0) + 1);
+      const pairKey = `${decision.providerKey}:${decision.direction}`;
+      counts.set(pairKey, (counts.get(pairKey) ?? 0) + 1);
     }
     return Array.from(counts.entries())
       .filter(([, count]) => count > 1)
-      .map(([providerKey]) => providerKey);
+      .map(([pairKey]) => {
+        const [providerKey, direction] = pairKey.split(':');
+        return `${providerKey} (${direction})`;
+      });
   }, [columnsAvailableForDecision, remainingDecisions]);
 
   const rowErrorsByRow = useMemo(() => {
@@ -1334,10 +1402,12 @@ export function MenuImportWizardPage() {
     pendingDecisionColumns.length === 0 &&
     missingRuleTypeColumns.length === 0 &&
     duplicateRuleTypes.length === 0 &&
+    missingExternalProviderDirectionColumns.length === 0 &&
     missingExternalProviderColumns.length === 0 &&
     unknownExternalProviderColumns.length === 0 &&
+    unsupportedExternalProviderDirectionColumns.length === 0 &&
     missingExternalProviderActivationColumns.length === 0 &&
-    duplicateExternalProviderKeys.length === 0 &&
+    duplicateExternalProviderDirectionPairs.length === 0 &&
     !providerCatalogUnavailableForExternalMappings &&
     incompleteBundleIDs.size === 0;
 
@@ -1570,6 +1640,10 @@ export function MenuImportWizardPage() {
               ? current.softLabelConfirmed
               : false
             : true,
+        direction:
+          mode === 'external_provider' && current.mode === 'external_provider'
+            ? current.direction
+            : '',
         providerKey:
           mode === 'external_provider' && current.mode === 'external_provider'
             ? current.providerKey
@@ -1600,8 +1674,36 @@ export function MenuImportWizardPage() {
           ruleType,
           label: current.label || column,
           softLabelConfirmed: true,
+          direction: '',
           providerKey: '',
           makeActive: null,
+        },
+      };
+    });
+    invalidateValidation();
+  };
+
+  const setDecisionDirection = (column: string, direction: MenuImportMappingDirection | '') => {
+    setRemainingDecisions((previous) => {
+      const current = previous[column] ?? createDefaultRemainingDecision(column);
+      const selectedProvider = current.providerKey
+        ? (providerCatalogByKey.get(current.providerKey) ?? null)
+        : null;
+      const keepProvider =
+        selectedProvider !== null &&
+        direction !== '' &&
+        providerSupportsDirection(selectedProvider, direction);
+      return {
+        ...previous,
+        [column]: {
+          ...current,
+          mode: 'external_provider',
+          ruleType: '',
+          label: current.label || column,
+          softLabelConfirmed: true,
+          direction,
+          providerKey: keepProvider ? current.providerKey : '',
+          makeActive: keepProvider ? current.makeActive : null,
         },
       };
     });
@@ -1621,6 +1723,7 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: current.label || column,
           softLabelConfirmed: true,
+          direction: current.direction,
           providerKey: normalizedProviderKey,
           makeActive:
             provider?.is_org_active || current.providerKey !== normalizedProviderKey
@@ -1643,6 +1746,7 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: current.label || column,
           softLabelConfirmed: true,
+          direction: current.direction,
           makeActive,
         },
       };
@@ -1661,6 +1765,7 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label,
           softLabelConfirmed: current.softLabelConfirmed,
+          direction: '',
           providerKey: '',
           makeActive: null,
         },
@@ -1680,6 +1785,7 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: current.label.trim() || column,
           softLabelConfirmed: true,
+          direction: '',
           providerKey: '',
           makeActive: null,
         },
@@ -1697,6 +1803,7 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: previous[column]?.label || column,
           softLabelConfirmed: true,
+          direction: '',
           providerKey: '',
           makeActive: null,
         };
@@ -1754,11 +1861,15 @@ export function MenuImportWizardPage() {
           label: decision.label.trim() || column,
         });
       }
-      if (decision.mode === 'external_provider' && decision.providerKey) {
+      if (decision.mode === 'external_provider' && decision.direction && decision.providerKey) {
         const provider = providerCatalogByKey.get(decision.providerKey);
+        if (provider && !providerSupportsDirection(provider, decision.direction)) {
+          continue;
+        }
         externalProviderMappings.push({
           column,
           provider_key: decision.providerKey,
+          direction: decision.direction,
           external_field: 'external_item_key',
           make_active:
             provider && !provider.is_org_active && decision.makeActive !== null
@@ -1941,6 +2052,7 @@ export function MenuImportWizardPage() {
           ruleType: decision.ruleType,
           label: decision.label || column,
           softLabelConfirmed: true,
+          direction: '',
           providerKey: '',
           makeActive: null,
         };
@@ -1952,6 +2064,7 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: decision.label || column,
           softLabelConfirmed: decision.softLabelConfirmed,
+          direction: '',
           providerKey: '',
           makeActive: null,
         };
@@ -1963,6 +2076,10 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: decision.label || column,
           softLabelConfirmed: true,
+          direction:
+            decision.direction === 'inbound' || decision.direction === 'outbound'
+              ? decision.direction
+              : '',
           providerKey: decision.providerKey || '',
           makeActive: typeof decision.makeActive === 'boolean' ? decision.makeActive : null,
         };
@@ -1974,6 +2091,7 @@ export function MenuImportWizardPage() {
           ruleType: '',
           label: decision.label || column,
           softLabelConfirmed: true,
+          direction: '',
           providerKey: '',
           makeActive: null,
         };
@@ -2317,6 +2435,16 @@ export function MenuImportWizardPage() {
     const selectedProvider = decision.providerKey
       ? (providerCatalogByKey.get(decision.providerKey) ?? null)
       : null;
+    const selectedProviderSupportsDirection =
+      selectedProvider !== null &&
+      decision.direction !== '' &&
+      providerSupportsDirection(selectedProvider, decision.direction);
+    const providersForDirection =
+      decision.direction === ''
+        ? []
+        : providerCatalog.filter((provider) =>
+            providerSupportsDirection(provider, decision.direction),
+          );
     const canChooseExternalProvider =
       !providerCatalogLoading && !providerCatalogError && providerCatalog.length > 0;
 
@@ -2429,6 +2557,47 @@ export function MenuImportWizardPage() {
             ) : null}
             {!providerCatalogLoading && !providerCatalogError && providerCatalog.length > 0 ? (
               <label className={styles.inputLabel}>
+                Direction
+                <select
+                  className={styles.selectControl}
+                  value={decision.direction}
+                  onChange={(event) =>
+                    setDecisionDirection(
+                      column,
+                      event.target.value as MenuImportMappingDirection | '',
+                    )
+                  }
+                >
+                  <option value="">Select direction...</option>
+                  {EXTERNAL_PROVIDER_DIRECTIONS.map((direction) => (
+                    <option key={`${column}-direction-${direction}`} value={direction}>
+                      {direction}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {!providerCatalogLoading &&
+            !providerCatalogError &&
+            providerCatalog.length > 0 &&
+            decision.direction === '' ? (
+              <p className={styles.helperSmall}>Select a direction before choosing a provider.</p>
+            ) : null}
+            {!providerCatalogLoading &&
+            !providerCatalogError &&
+            providerCatalog.length > 0 &&
+            decision.direction !== '' &&
+            providersForDirection.length === 0 ? (
+              <p className={styles.warning}>
+                No providers support the selected {decision.direction} direction.
+              </p>
+            ) : null}
+            {!providerCatalogLoading &&
+            !providerCatalogError &&
+            providerCatalog.length > 0 &&
+            decision.direction !== '' &&
+            providersForDirection.length > 0 ? (
+              <label className={styles.inputLabel}>
                 Provider
                 <select
                   className={styles.selectControl}
@@ -2436,7 +2605,7 @@ export function MenuImportWizardPage() {
                   onChange={(event) => setDecisionProviderKey(column, event.target.value)}
                 >
                   <option value="">Select provider...</option>
-                  {providerCatalog.map((provider) => (
+                  {providersForDirection.map((provider) => (
                     <option
                       key={`${column}-provider-${provider.provider_key}`}
                       value={provider.provider_key}
@@ -2452,7 +2621,16 @@ export function MenuImportWizardPage() {
                 Selected provider {decision.providerKey} is not available in the current catalog.
               </p>
             ) : null}
-            {selectedProvider && !selectedProvider.is_org_active ? (
+            {selectedProvider && decision.direction !== '' && !selectedProviderSupportsDirection ? (
+              <p className={styles.warning}>
+                Selected provider {decision.providerKey} does not support {decision.direction}{' '}
+                mappings.
+              </p>
+            ) : null}
+            {selectedProvider &&
+            decision.direction !== '' &&
+            selectedProviderSupportsDirection &&
+            !selectedProvider.is_org_active ? (
               <>
                 <p className={styles.helperSmall}>
                   {selectedProvider.is_org_configured
@@ -2478,7 +2656,10 @@ export function MenuImportWizardPage() {
                 </label>
               </>
             ) : null}
-            {selectedProvider?.is_org_active ? (
+            {selectedProvider &&
+            decision.direction !== '' &&
+            selectedProviderSupportsDirection &&
+            selectedProvider.is_org_active ? (
               <p className={styles.helperSmall}>Provider is already active for this org.</p>
             ) : null}
           </>
@@ -3109,7 +3290,8 @@ export function MenuImportWizardPage() {
           {pendingDecisionColumns.length > 0 ? (
             <p className={styles.warning}>
               Complete actions for remaining columns (hard-rule type, soft-rule confirmation, or
-              provider + activation choice): {pendingDecisionColumns.join(', ')}.
+              provider direction + selection + activation choice):{' '}
+              {pendingDecisionColumns.join(', ')}.
             </p>
           ) : null}
           {missingRuleTypeColumns.length > 0 ? (
@@ -3123,9 +3305,21 @@ export function MenuImportWizardPage() {
               {duplicateRuleTypes.join(', ')}.
             </p>
           ) : null}
+          {missingExternalProviderDirectionColumns.length > 0 ? (
+            <p className={styles.warning}>
+              Select an external provider direction for:{' '}
+              {missingExternalProviderDirectionColumns.join(', ')}.
+            </p>
+          ) : null}
           {missingExternalProviderColumns.length > 0 ? (
             <p className={styles.warning}>
               Select an external provider for: {missingExternalProviderColumns.join(', ')}.
+            </p>
+          ) : null}
+          {unsupportedExternalProviderDirectionColumns.length > 0 ? (
+            <p className={styles.warning}>
+              Selected provider does not support the chosen direction for:{' '}
+              {unsupportedExternalProviderDirectionColumns.join(', ')}.
             </p>
           ) : null}
           {missingExternalProviderActivationColumns.length > 0 ? (
@@ -3133,10 +3327,10 @@ export function MenuImportWizardPage() {
               Choose Make Active? yes/no for: {missingExternalProviderActivationColumns.join(', ')}.
             </p>
           ) : null}
-          {duplicateExternalProviderKeys.length > 0 ? (
+          {duplicateExternalProviderDirectionPairs.length > 0 ? (
             <p className={styles.warning}>
-              Each provider key can only be mapped once. Duplicate:{' '}
-              {duplicateExternalProviderKeys.join(', ')}.
+              Each provider + direction pair can only be mapped once. Duplicate:{' '}
+              {duplicateExternalProviderDirectionPairs.join(', ')}.
             </p>
           ) : null}
           {unknownExternalProviderColumns.length > 0 ? (
@@ -3403,11 +3597,15 @@ export function MenuImportWizardPage() {
                               if (!externalItemKey) {
                                 return '';
                               }
+                              const direction =
+                                mapping.direction === 'inbound' || mapping.direction === 'outbound'
+                                  ? mapping.direction
+                                  : 'unknown';
                               const providerLabel =
                                 providerCatalogByKey.get(mapping.provider_key)?.label?.trim() ||
                                 mapping.provider_name?.trim() ||
                                 mapping.provider_key;
-                              return `${providerLabel || mapping.provider_key}: ${externalItemKey}`;
+                              return `${direction} • ${providerLabel || mapping.provider_key}: ${externalItemKey}`;
                             })
                             .filter((value) => value.length > 0);
 
