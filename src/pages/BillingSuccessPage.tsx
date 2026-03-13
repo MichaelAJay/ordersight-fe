@@ -131,7 +131,7 @@ export function BillingSuccessPage() {
         <Button variant="primary" size="lg" onPress={() => navigate('/dashboard')}>
           Continue To Dashboard
         </Button>
-        <Button variant="outline" size="lg" onPress={() => navigate('/billing')}>
+        <Button variant="outline" size="lg" onPress={() => navigate('/settings/billing')}>
           Open Billing
         </Button>
       </div>

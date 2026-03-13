@@ -34,7 +34,7 @@ export function AuthenticatedLayout() {
               <NavLink to="/orders">Orders</NavLink>
               <NavLink to="/contacts">Contacts</NavLink>
               <NavLink to="/members">Members</NavLink>
-              <NavLink to="/billing">Billing</NavLink>
+              <NavLink to="/settings/billing">Billing</NavLink>
               <NavLink to="/audits">Audit Logs</NavLink>
               <UserButton />
             </nav>

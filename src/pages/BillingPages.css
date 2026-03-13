@@ -26,6 +26,13 @@
     linear-gradient(145deg, #193127, #0d1814 65%);
 }
 
+.billing-hero-dashboard {
+  background:
+    radial-gradient(circle at top left, rgba(100, 184, 255, 0.24), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(95, 226, 209, 0.18), transparent 28%),
+    linear-gradient(145deg, #18263a, #0f1523 66%);
+}
+
 .billing-hero-copy {
   flex: 1 1 34rem;
 }
@@ -135,6 +142,14 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
   margin-top: 1.5rem;
+}
+
+.billing-grid-dashboard {
+  align-items: stretch;
+}
+
+.billing-grid-dashboard-secondary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .billing-card {
