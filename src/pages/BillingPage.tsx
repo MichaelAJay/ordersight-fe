@@ -108,7 +108,9 @@ export function BillingPage() {
         : preferredInterval;
   const subscription = subscriptionQuery.data?.subscription ?? null;
   const currentPlanCode =
-    subscription && subscription.status !== 'canceled' ? subscription.plan_code : null;
+    subscription && subscription.portal_available && subscription.status !== 'canceled'
+      ? subscription.plan_code
+      : null;
 
   const handleRetry = () => {
     setNotice(null);

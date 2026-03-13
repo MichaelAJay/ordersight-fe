@@ -1,7 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/common/Button/Button';
-import { getBillingSubscription } from '@/services/billing';
+import {
+  createPortalSession,
+  getBillingSubscription,
+  openExternalURLInNewTab,
+} from '@/services/billing';
+import { type HttpError } from '@/services/http';
 import { formatDate } from '@/utils/date';
 import './BillingPages.css';
 
@@ -13,8 +19,20 @@ function formatInterval(interval: string) {
   return interval === 'year' ? 'Yearly' : 'Monthly';
 }
 
+function getPortalErrorMessage(error: unknown) {
+  const normalized = error as HttpError | Error | null;
+  const status = (normalized as HttpError | null)?.status;
+
+  if (status === 404) {
+    return 'We could not find a portal-enabled subscription for this organization yet.';
+  }
+
+  return 'We could not open the billing portal right now. Try again in a moment.';
+}
+
 export function BillingDashboardPage() {
   const navigate = useNavigate();
+  const [portalError, setPortalError] = useState<string | null>(null);
   const subscriptionQuery = useQuery({
     queryKey: ['billing', 'dashboard', 'subscription'],
     queryFn: getBillingSubscription,
@@ -22,6 +40,34 @@ export function BillingDashboardPage() {
   });
 
   const subscription = subscriptionQuery.data?.subscription ?? null;
+  const canManageSubscription = subscription?.portal_available === true;
+  const portalMutation = useMutation({
+    mutationFn: createPortalSession,
+    onSuccess: (result) => {
+      openExternalURLInNewTab(result.portal_url);
+    },
+    onError: (error) => {
+      setPortalError(getPortalErrorMessage(error));
+    },
+  });
+
+  const handleOpenPortal = () => {
+    if (!canManageSubscription) {
+      return;
+    }
+
+    setPortalError(null);
+    portalMutation.mutate();
+  };
+
+  const handleBillingAction = () => {
+    if (canManageSubscription) {
+      handleOpenPortal();
+      return;
+    }
+
+    navigate('/billing');
+  };
 
   return (
     <section className="billing-shell">
@@ -40,6 +86,12 @@ export function BillingDashboardPage() {
         <div className="billing-banner" role="status">
           Your subscription will end on {formatDate(subscription.current_period_end)}. You
           won&apos;t be charged again.
+        </div>
+      ) : null}
+
+      {portalError ? (
+        <div className="billing-banner billing-banner-error" role="alert">
+          {portalError}
         </div>
       ) : null}
 
@@ -108,6 +160,26 @@ export function BillingDashboardPage() {
                 {subscription.plan_name} • {formatSubscriptionStatus(subscription.status)} •{' '}
                 {subscription.seats_used} / {subscription.seat_limit} seats used
               </code>
+              <p className="billing-status-line">
+                {canManageSubscription
+                  ? 'The portal opens in a new tab so you can return here after payment or cancellation changes.'
+                  : 'This organization is still using a local trial snapshot. Choose a plan and complete Polar checkout before portal access is available.'}
+              </p>
+              <div className="billing-card-footer">
+                <Button
+                  variant={canManageSubscription ? 'outline' : 'primary'}
+                  size="lg"
+                  block
+                  isDisabled={portalMutation.isPending}
+                  onPress={handleBillingAction}
+                >
+                  {portalMutation.isPending
+                    ? 'Opening portal...'
+                    : canManageSubscription
+                      ? 'Manage Subscription'
+                      : 'Choose Plan'}
+                </Button>
+              </div>
             </article>
           </div>
         </>
@@ -123,6 +195,9 @@ export function BillingDashboardPage() {
           <div className="billing-actions">
             <Button variant="primary" size="lg" onPress={() => navigate('/billing')}>
               View Pricing
+            </Button>
+            <Button variant="outline" size="lg" isDisabled>
+              Manage Subscription
             </Button>
           </div>
         </article>

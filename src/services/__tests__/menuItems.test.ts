@@ -178,7 +178,7 @@ describe('menuItems service', () => {
     expect(getJSONMock).toHaveBeenCalledWith('/menu-items/item-2');
     expect(result?.id).toBe('item-2');
     expect(result?.soft_rules).toHaveLength(1);
-    expect(result?.soft_rules[0].label).toBe('Kitchen');
+    expect(result?.soft_rules[0]?.label).toBe('Kitchen');
     expect(result?.external_provider_mappings).toEqual([]);
   });
 });

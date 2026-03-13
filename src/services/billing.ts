@@ -28,6 +28,7 @@ export interface CurrentSubscription {
   plan_name: string;
   billing_interval: BillingInterval;
   status: BillingState;
+  portal_available: boolean;
   current_period_end?: string | null;
   cancel_at_period_end: boolean;
   seat_limit: number;
@@ -44,6 +45,10 @@ export interface CreateCheckoutSessionRequest {
 
 export interface CreateCheckoutSessionResponse {
   checkout_url: string;
+}
+
+export interface CreatePortalSessionResponse {
+  portal_url: string;
 }
 
 export async function listBillingPlans(): Promise<ListBillingPlansResponse> {
@@ -63,6 +68,17 @@ export async function createCheckoutSession(
   );
 }
 
+export async function createPortalSession(): Promise<CreatePortalSessionResponse> {
+  return postJSON<undefined, CreatePortalSessionResponse>('/billing/portal');
+}
+
 export function redirectToExternalURL(url: string) {
   window.location.assign(url);
+}
+
+export function openExternalURLInNewTab(url: string) {
+  const opened = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!opened) {
+    window.location.assign(url);
+  }
 }

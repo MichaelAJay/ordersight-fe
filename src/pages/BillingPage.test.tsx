@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingPage } from './BillingPage';
 import { renderWithProviders } from '@/test/testUtils';
 import {
+  ListBillingPlansResponse,
   createCheckoutSession,
   getBillingSubscription,
   listBillingPlans,
@@ -84,6 +85,7 @@ beforeEach(() => {
       plan_name: 'Basic',
       billing_interval: 'month',
       status: 'active',
+      portal_available: true,
       current_period_end: null,
       cancel_at_period_end: false,
       seat_limit: 5,
@@ -141,6 +143,35 @@ describe('BillingPage', () => {
     });
   });
 
+  it('allows checkout for a bootstrap trial even when the seeded local plan matches', async () => {
+    const user = userEvent.setup();
+    mockedGetBillingSubscription.mockResolvedValue({
+      subscription: {
+        plan_code: 'basic',
+        plan_name: 'Basic',
+        billing_interval: 'month',
+        status: 'trial',
+        portal_available: false,
+        current_period_end: '2026-04-12T12:00:00Z',
+        cancel_at_period_end: false,
+        seat_limit: 5,
+        seats_used: 1,
+      },
+    });
+
+    renderWithProviders(<BillingPage />);
+
+    await screen.findByRole('heading', { name: 'Basic' });
+    await user.click(screen.getByRole('button', { name: 'Start trial' }));
+
+    await waitFor(() => {
+      expect(mockedCreateCheckoutSession).toHaveBeenCalled();
+      expect(mockedCreateCheckoutSession.mock.calls[0]?.[0]).toEqual({
+        plan_price_id: 'price-basic-month',
+      });
+    });
+  });
+
   it('shows a subscription conflict message when checkout returns 409', async () => {
     const user = userEvent.setup();
     mockedCreateCheckoutSession.mockRejectedValue({
@@ -159,7 +190,7 @@ describe('BillingPage', () => {
   });
 
   it('shows loading and error states for billing data', async () => {
-    let resolvePlans: ((value: typeof plansResponse) => void) | null = null;
+    let resolvePlans: ((value: ListBillingPlansResponse) => void) | undefined;
     mockedListBillingPlans.mockImplementation(
       () =>
         new Promise((resolve) => {

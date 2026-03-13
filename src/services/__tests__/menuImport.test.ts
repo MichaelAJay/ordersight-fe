@@ -358,9 +358,11 @@ describe('menuImport service', () => {
 
     expect(getJSONMock).toHaveBeenCalledWith('/imports/mappings');
     expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('Catering Sheet');
-    expect(result[0].mapping.field_mappings.item_name).toBe('ItemName');
-    expect(result[0].mapping.remaining_decisions['EZ Item ID']).toEqual({
+    const firstMapping = result[0];
+    expect(firstMapping).toBeDefined();
+    expect(firstMapping?.name).toBe('Catering Sheet');
+    expect(firstMapping?.mapping.field_mappings['item_name']).toBe('ItemName');
+    expect(firstMapping?.mapping.remaining_decisions['EZ Item ID']).toEqual({
       mode: 'external_provider',
       provider_key: 'ezcater',
       make_active: true,
